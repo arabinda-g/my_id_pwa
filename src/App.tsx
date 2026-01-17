@@ -16,8 +16,8 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/90 px-4 py-4 backdrop-blur">
+    <div className="min-h-screen min-h-[100dvh] bg-slate-950 text-slate-100">
+      <header className="safe-area-top sticky top-0 z-20 border-b border-slate-800 bg-slate-950/90 px-4 py-4 backdrop-blur">
         <div className="mx-auto flex max-w-xl items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-400">
@@ -51,7 +51,7 @@ export default function App() {
         </Suspense>
       </main>
 
-      <nav className="sticky bottom-0 z-20 border-t border-slate-800 bg-slate-950/95 px-4 py-3 backdrop-blur">
+      <nav className="safe-area-bottom sticky bottom-0 z-20 border-t border-slate-800 bg-slate-950/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-xl items-center justify-between">
           <NavLink to="/" className={navLinkClass} end>
             <span className="text-base">🏠</span>
