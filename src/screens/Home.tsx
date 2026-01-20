@@ -81,6 +81,39 @@ const normalizePinnedFields = (fields: string[]) => {
   return normalized;
 };
 
+const formatPhoneNumber = (input: string) => {
+  const trimmed = input.trim();
+  if (!trimmed) return trimmed;
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return trimmed;
+
+  if (trimmed.startsWith("+")) {
+    if (digits.startsWith("91") && digits.length >= 12) {
+      const national = digits.slice(2);
+      const formattedNational =
+        national.length > 5 ? `${national.slice(0, 5)} ${national.slice(5)}` : national;
+      return `+91 ${formattedNational}`;
+    }
+    const ccLen = [1, 2, 3].find((len) => digits.length - len >= 4) ?? 1;
+    const countryCode = digits.slice(0, ccLen);
+    const rest = digits.slice(ccLen);
+    return rest ? `+${countryCode} ${rest}` : `+${countryCode}`;
+  }
+
+  if (digits.startsWith("91") && digits.length >= 12) {
+    const national = digits.slice(2);
+    const formattedNational =
+      national.length > 5 ? `${national.slice(0, 5)} ${national.slice(5)}` : national;
+    return `+91 ${formattedNational}`;
+  }
+
+  if (digits.length === 10) {
+    return `${digits.slice(0, 5)} ${digits.slice(5)}`;
+  }
+
+  return trimmed;
+};
+
 const fieldCategories: CategoryConfig[] = [
   {
     title: "Personal Information",
@@ -822,7 +855,9 @@ function UserInfoForm({
               {quickInfoOpen.label}
             </p>
             <p className="break-words text-2xl font-semibold text-black/90">
-              {quickInfoOpen.value}
+              {quickInfoOpen.key === "phoneNumber"
+                ? formatPhoneNumber(quickInfoOpen.value)
+                : quickInfoOpen.value}
             </p>
           </div>
         ) : null}
@@ -926,6 +961,7 @@ type FieldRowProps = {
 function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }: FieldRowProps) {
   const Icon = field.icon;
   const [isZoomOpen, setIsZoomOpen] = useState(false);
+  const displayValue = field.key === "phoneNumber" ? formatPhoneNumber(value) : value;
 
   if (isViewMode) {
     return (
@@ -953,7 +989,7 @@ function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }:
             <p className="text-xs font-semibold uppercase tracking-wide text-black/40">
               {field.label}
             </p>
-            <p className="text-base font-semibold text-black/80">{value}</p>
+            <p className="text-base font-semibold text-black/80">{displayValue}</p>
           </div>
           <button
             className={`rounded-lg p-2 ${isPinned ? "bg-purple-100 text-purple-700" : "bg-black/5 text-black/50"}`}
@@ -987,7 +1023,7 @@ function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }:
             <p className="text-sm font-semibold uppercase tracking-wide text-black/40">
               {field.label}
             </p>
-            <p className="break-words text-2xl font-semibold text-black/90">{value}</p>
+            <p className="break-words text-2xl font-semibold text-black/90">{displayValue}</p>
           </div>
         </Modal>
       </>
