@@ -683,13 +683,6 @@ function UserInfoForm({
             <p className="break-words text-2xl font-semibold text-black/90">
               {quickInfoOpen.value}
             </p>
-            <button
-              className="absolute -bottom-3 -right-3 bg-transparent p-2 text-black/60 shadow-none hover:bg-transparent focus:outline-none focus-visible:outline-none"
-              onClick={() => navigator.clipboard.writeText(quickInfoOpen.value)}
-              aria-label={`Copy ${quickInfoOpen.label}`}
-            >
-              <MdContentCopy />
-            </button>
           </div>
         ) : null}
       </Modal>
@@ -852,16 +845,6 @@ function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }:
               {field.label}
             </p>
             <p className="break-words text-2xl font-semibold text-black/90">{value}</p>
-            <button
-              className="absolute -bottom-3 -right-3 bg-transparent p-2 text-black/60 shadow-none hover:bg-transparent focus:outline-none focus-visible:outline-none"
-              onClick={() => {
-                if (!value) return;
-                navigator.clipboard.writeText(value);
-              }}
-              aria-label={`Copy ${field.label}`}
-            >
-              <MdContentCopy />
-            </button>
           </div>
         </Modal>
       </>
