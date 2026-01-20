@@ -59,6 +59,28 @@ type CategoryConfig = {
   fields: FieldConfig[];
 };
 
+const NAME_PIN_KEY = "fullName";
+
+const isNameField = (key: string) => key === "firstName" || key === "lastName";
+
+const normalizePinnedFields = (fields: string[]) => {
+  let hasName = false;
+  const normalized: string[] = [];
+  fields.forEach((key) => {
+    if (isNameField(key) || key === NAME_PIN_KEY) {
+      if (!hasName) {
+        normalized.push(NAME_PIN_KEY);
+        hasName = true;
+      }
+      return;
+    }
+    if (!normalized.includes(key)) {
+      normalized.push(key);
+    }
+  });
+  return normalized;
+};
+
 const fieldCategories: CategoryConfig[] = [
   {
     title: "Personal Information",
@@ -131,7 +153,12 @@ export default function Home() {
     setLocalUserData(data);
     setIsViewMode(Object.values(data).some((value) => value.trim().length > 0));
     setLocalProfileImage(getProfileImage());
-    setPinnedFields(getPinnedFields());
+    const storedPinned = getPinnedFields();
+    const normalizedPinned = normalizePinnedFields(storedPinned);
+    setPinnedFields(normalizedPinned);
+    if (storedPinned.join("|") !== normalizedPinned.join("|")) {
+      setPinnedFieldsStorage(normalizedPinned);
+    }
   }, []);
 
   const userName = useMemo(() => userData["firstName"] || "User", [userData]);
@@ -377,9 +404,17 @@ export default function Home() {
           pinnedFields={pinnedFields}
           onTogglePin={(key) => {
             setPinnedFields((prev) => {
-              const updated = prev.includes(key)
-                ? prev.filter((item) => item !== key)
-                : [...prev, key];
+              const normalized = normalizePinnedFields(prev);
+              let updated: string[] = [];
+              if (isNameField(key)) {
+                updated = normalized.includes(NAME_PIN_KEY)
+                  ? normalized.filter((item) => item !== NAME_PIN_KEY)
+                  : [...normalized, NAME_PIN_KEY];
+              } else {
+                updated = normalized.includes(key)
+                  ? normalized.filter((item) => item !== key)
+                  : [...normalized, key];
+              }
               setPinnedFieldsStorage(updated);
               return updated;
             });
@@ -474,6 +509,12 @@ function UserInfoForm({
     Icon: React.ComponentType<{ className?: string }>;
   } | null>(null);
 
+  const fullNameValue = useMemo(() => {
+    const first = userData["firstName"]?.trim() ?? "";
+    const last = userData["lastName"]?.trim() ?? "";
+    return [first, last].filter(Boolean).join(" ").trim();
+  }, [userData]);
+
   const fieldConfigMap = useMemo(() => {
     const entries = fieldCategories.flatMap((category) =>
       category.fields.map((field) => [field.key, field] as const)
@@ -481,20 +522,45 @@ function UserInfoForm({
     return new Map(entries);
   }, []);
 
-  const pinnedQuickInfo = useMemo(() => {
-    return pinnedFields
-      .map((key) => {
-        const value = userData[key]?.trim() ?? "";
-        const field = fieldConfigMap.get(key);
-        return {
-          key,
-          label: field?.label ?? key,
-          value,
-          Icon: field?.icon ?? MdInfoOutline
-        };
-      })
-      .filter((item) => item.value.length > 0);
-  }, [fieldConfigMap, pinnedFields, userData]);
+  const pinnedQuickInfo = useMemo<
+    {
+      key: string;
+      label: string;
+      value: string;
+      Icon: React.ComponentType<{ className?: string }>;
+    }[]
+  >(() => {
+    const items: {
+      key: string;
+      label: string;
+      value: string;
+      Icon: React.ComponentType<{ className?: string }>;
+    }[] = [];
+
+    pinnedFields.forEach((key) => {
+      if (key === NAME_PIN_KEY) {
+        if (!fullNameValue) return;
+        items.push({
+          key: NAME_PIN_KEY,
+          label: "Name",
+          value: fullNameValue,
+          Icon: MdPerson
+        });
+        return;
+      }
+      const value = userData[key]?.trim() ?? "";
+      if (!value) return;
+      const field = fieldConfigMap.get(key);
+      items.push({
+        key,
+        label: field?.label ?? key,
+        value,
+        Icon: field?.icon ?? MdInfoOutline
+      });
+    });
+
+    return items;
+  }, [fieldConfigMap, fullNameValue, pinnedFields, userData]);
 
   const buildQuickAction = (
     icon: React.ComponentType<{ className?: string }>,
@@ -712,6 +778,8 @@ function CategorySection({
   shouldShowField
 }: CategorySectionProps) {
   const Icon = category.icon;
+  const isPinnedField = (key: string) =>
+    isNameField(key) ? pinnedFields.includes(NAME_PIN_KEY) : pinnedFields.includes(key);
   return (
     <div
       className="overflow-hidden rounded-3xl border bg-white shadow-lg"
@@ -761,7 +829,7 @@ function CategorySection({
               isViewMode={isViewMode}
               value={userData[field.key] ?? ""}
               onChange={(value) => onUpdateField(field.key, value)}
-              isPinned={pinnedFields.includes(field.key)}
+              isPinned={isPinnedField(field.key)}
               onTogglePin={() => onTogglePin(field.key)}
             />
           ) : null
