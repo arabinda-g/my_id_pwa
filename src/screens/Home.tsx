@@ -27,7 +27,6 @@ import {
   MdPhone,
   MdQrCode,
   MdQrCodeScanner,
-  MdRefresh,
   MdSave,
   MdShare,
   MdVideoCall
@@ -189,23 +188,6 @@ export default function Home() {
     setLocalUserData(cleaned);
     setIsViewMode(true);
     showMessage("Data saved successfully!", "ok");
-  };
-
-  const refreshData = () => {
-    const data = getUserData();
-    setLocalUserData(data);
-    setIsViewMode(Object.values(data).some((value) => value.trim().length > 0));
-    showMessage("Profile refreshed", "ok");
-  };
-
-  const copyAll = () => {
-    const lines = Object.entries(userData)
-      .filter(([, value]) => value.trim())
-      .map(([key, value]) => `${key}: ${value}`)
-      .join("\n");
-    if (!lines) return;
-    navigator.clipboard.writeText(lines);
-    showMessage("All profile data copied!", "ok");
   };
 
   const completionPercentage = () => {
@@ -389,8 +371,6 @@ export default function Home() {
             }
             navigate("/qr");
           }}
-          onCopyAll={copyAll}
-          onRefresh={refreshData}
           completionPercentage={completionPercentage()}
           categoryCompletion={categoryCompletion}
           onPickImage={handleImagePick}
@@ -440,8 +420,6 @@ type UserInfoFormProps = {
   onSave: () => void;
   onSwitchToEdit: () => void;
   onShareQR: () => void;
-  onCopyAll: () => void;
-  onRefresh: () => void;
   completionPercentage: number;
   categoryCompletion: (category: CategoryConfig) => number;
   onPickImage: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -456,8 +434,6 @@ function UserInfoForm({
   onSave,
   onSwitchToEdit,
   onShareQR,
-  onCopyAll,
-  onRefresh,
   completionPercentage,
   categoryCompletion,
   onPickImage,
@@ -562,8 +538,6 @@ function UserInfoForm({
 
             <div className="grid grid-cols-3 gap-3">
               {buildQuickAction(MdQrCode, "Share QR", "#22c55e", onShareQR)}
-              {buildQuickAction(MdContentCopy, "Copy All", "#3b82f6", onCopyAll)}
-              {buildQuickAction(MdRefresh, "Refresh", "#f59e0b", onRefresh)}
             </div>
           </div>
         ) : (
