@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import QRCode from "react-qr-code";
 import { MdArrowBack, MdShare } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
-import { getUserData } from "../utils/storage";
+import { getProfileImage, getUserData } from "../utils/storage";
 
 const buildVCard = (userData: Record<string, string>) => {
   const firstName = userData["First Name"] || userData["first_name"] || "";
@@ -80,10 +80,12 @@ export default function QRDisplay() {
   const navigate = useNavigate();
   const [userData, setUserData] = useState<Record<string, string>>({});
   const [isGenerating, setIsGenerating] = useState(true);
+  const [profileImage, setProfileImage] = useState("");
 
   useEffect(() => {
     const data = getUserData();
     setUserData(data);
+    setProfileImage(getProfileImage());
     setIsGenerating(false);
   }, []);
 
@@ -115,9 +117,13 @@ export default function QRDisplay() {
       <main className="mx-auto max-w-xl space-y-6 px-6 py-6">
         <div className="rounded-3xl bg-white p-6 shadow-lg shadow-black/10">
           <div className="flex flex-col items-center gap-2">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-purple-700 text-3xl text-white">
-              👤
-            </div>
+            {profileImage ? (
+              <img src={profileImage} alt="Profile" className="h-20 w-20 rounded-full object-cover" />
+            ) : (
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-purple-700 text-3xl text-white">
+                👤
+              </div>
+            )}
             <p className="text-2xl font-bold text-black/90">
               {`${userData["First Name"] || ""} ${userData["Last Name"] || ""}`.trim()}
             </p>

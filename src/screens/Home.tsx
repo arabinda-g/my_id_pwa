@@ -151,6 +151,7 @@ export default function Home() {
         setProfileImage(result);
         setLocalProfileImage(result);
       }
+      event.target.value = "";
     };
     reader.readAsDataURL(file);
   };
@@ -225,7 +226,11 @@ export default function Home() {
 
   const handleExport = () => {
     const data = getUserData();
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
+    const exportPayload = {
+      userData: data,
+      profileImage: getProfileImage()
+    };
+    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
       type: "application/json"
     });
     const url = URL.createObjectURL(blob);
@@ -241,9 +246,18 @@ export default function Home() {
     if (!file) return;
     try {
       const text = await file.text();
-      const data = JSON.parse(text) as Record<string, string>;
+      const parsed = JSON.parse(text) as unknown;
+      if (!parsed || typeof parsed !== "object") {
+        throw new Error("Invalid profile data");
+      }
+      const parsedObject = parsed as { userData?: Record<string, string>; profileImage?: string };
+      const hasUserData = Object.prototype.hasOwnProperty.call(parsedObject, "userData");
+      const data = hasUserData ? parsedObject.userData ?? {} : (parsed as Record<string, string>);
+      const image = hasUserData ? parsedObject.profileImage ?? "" : "";
       setUserData(data);
       setLocalUserData(data);
+      setProfileImage(image);
+      setLocalProfileImage(image);
       setIsViewMode(Object.values(data).some((value) => value.trim().length > 0));
       showMessage("Profile imported", "ok");
     } catch {
@@ -364,6 +378,7 @@ export default function Home() {
         <UserInfoForm
           isViewMode={isViewMode}
           userData={userData}
+          profileImage={profileImage}
           onUpdateField={updateField}
           onSave={saveUserInfo}
           onSwitchToEdit={() => setIsViewMode(false)}
@@ -378,6 +393,11 @@ export default function Home() {
           onRefresh={refreshData}
           completionPercentage={completionPercentage()}
           categoryCompletion={categoryCompletion}
+          onPickImage={handleImagePick}
+          onClearImage={() => {
+            setProfileImage("");
+            setLocalProfileImage("");
+          }}
         />
 
         <button
@@ -415,6 +435,7 @@ export default function Home() {
 type UserInfoFormProps = {
   isViewMode: boolean;
   userData: Record<string, string>;
+  profileImage: string;
   onUpdateField: (hint: string, value: string) => void;
   onSave: () => void;
   onSwitchToEdit: () => void;
@@ -423,11 +444,14 @@ type UserInfoFormProps = {
   onRefresh: () => void;
   completionPercentage: number;
   categoryCompletion: (category: CategoryConfig) => number;
+  onPickImage: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onClearImage: () => void;
 };
 
 function UserInfoForm({
   isViewMode,
   userData,
+  profileImage,
   onUpdateField,
   onSave,
   onSwitchToEdit,
@@ -435,8 +459,12 @@ function UserInfoForm({
   onCopyAll,
   onRefresh,
   completionPercentage,
-  categoryCompletion
+  categoryCompletion,
+  onPickImage,
+  onClearImage
 }: UserInfoFormProps) {
+  const profileInputRef = useRef<HTMLInputElement | null>(null);
+
   const buildQuickInfo = (
     icon: React.ComponentType<{ className?: string }>,
     label: string,
@@ -500,9 +528,17 @@ function UserInfoForm({
         {isViewMode ? (
           <div className="space-y-4">
             <div className="flex items-center gap-4">
-              <div className="rounded-2xl bg-gradient-to-br from-purple-700 to-purple-400 p-4 text-white shadow-lg shadow-purple-700/30">
-                <MdPerson className="text-3xl" />
-              </div>
+              {profileImage ? (
+                <img
+                  src={profileImage}
+                  alt="Profile"
+                  className="h-16 w-16 rounded-2xl object-cover shadow-lg shadow-purple-700/30"
+                />
+              ) : (
+                <div className="rounded-2xl bg-gradient-to-br from-purple-700 to-purple-400 p-4 text-white shadow-lg shadow-purple-700/30">
+                  <MdPerson className="text-3xl" />
+                </div>
+              )}
               <div className="flex-1">
                 <p className="text-2xl font-bold text-black/90">
                   {userData["First Name"] || "User"}
@@ -536,6 +572,43 @@ function UserInfoForm({
               <div>
                 <h2 className="text-2xl font-bold text-black/90">Edit Profile</h2>
                 <p className="text-sm text-black/50">Update your details</p>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-4 rounded-2xl border border-black/10 bg-white p-4">
+              {profileImage ? (
+                <img src={profileImage} alt="Profile" className="h-16 w-16 rounded-full object-cover" />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-purple-700/10">
+                  <MdPerson className="text-2xl text-purple-700" />
+                </div>
+              )}
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-black/80">Profile photo (optional)</p>
+                <p className="text-xs text-black/50">Upload a square image for best results</p>
+              </div>
+              <input
+                ref={profileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onPickImage}
+                aria-label="Upload profile photo"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  className="rounded-lg border border-purple-700/20 px-3 py-2 text-xs font-semibold text-purple-700"
+                  onClick={() => profileInputRef.current?.click()}
+                >
+                  Upload
+                </button>
+                {profileImage ? (
+                  <button
+                    className="rounded-lg border border-black/10 px-3 py-2 text-xs font-semibold text-black/60"
+                    onClick={onClearImage}
+                  >
+                    Remove
+                  </button>
+                ) : null}
               </div>
             </div>
             <div className="mt-4">
