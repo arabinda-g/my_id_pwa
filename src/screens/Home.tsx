@@ -122,6 +122,7 @@ export default function Home() {
     status: "checking" | "needsSetup" | "needsVerify" | "verified" | "unsupported";
     error?: string;
   }>({ status: "checking" });
+  const [unlockedCategories, setUnlockedCategories] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState<{ text: string; tone: "ok" | "warn" | "error" } | null>(
     null
   );
@@ -189,36 +190,59 @@ export default function Home() {
     return bytes;
   };
 
+  const createCredentialId = async (displayName: string) => {
+    const publicKey: PublicKeyCredentialCreationOptions = {
+      challenge: createChallenge(),
+      rp: { name: "Info Card" },
+      user: {
+        id: createChallenge(),
+        name: "local-user",
+        displayName
+      },
+      pubKeyCredParams: [
+        { type: "public-key", alg: -7 },
+        { type: "public-key", alg: -257 }
+      ],
+      authenticatorSelection: {
+        authenticatorAttachment: "platform",
+        userVerification: "required"
+      },
+      timeout: 60000,
+      attestation: "none"
+    };
+    const credential = (await navigator.credentials.create({
+      publicKey
+    })) as PublicKeyCredential | null;
+    if (!credential) return "";
+    return bufferToBase64Url(credential.rawId);
+  };
+
+  const requestAssertion = async (credentialId: string) => {
+    const publicKey: PublicKeyCredentialRequestOptions = {
+      challenge: createChallenge(),
+      allowCredentials: [
+        {
+          id: base64UrlToBuffer(credentialId),
+          type: "public-key"
+        }
+      ],
+      userVerification: "required",
+      timeout: 60000
+    };
+    const assertion = (await navigator.credentials.get({
+      publicKey
+    })) as PublicKeyCredential | null;
+    return Boolean(assertion);
+  };
+
   const setupFaceId = async () => {
     try {
       setAuthState({ status: "needsSetup" });
-      const publicKey: PublicKeyCredentialCreationOptions = {
-        challenge: createChallenge(),
-        rp: { name: "Info Card" },
-        user: {
-          id: createChallenge(),
-          name: "local-user",
-          displayName: userName || "User"
-        },
-        pubKeyCredParams: [
-          { type: "public-key", alg: -7 },
-          { type: "public-key", alg: -257 }
-        ],
-        authenticatorSelection: {
-          authenticatorAttachment: "platform",
-          userVerification: "required"
-        },
-        timeout: 60000,
-        attestation: "none"
-      };
-      const credential = (await navigator.credentials.create({
-        publicKey
-      })) as PublicKeyCredential | null;
-      if (!credential) {
+      const credentialId = await createCredentialId(userName || "User");
+      if (!credentialId) {
         setAuthState({ status: "needsSetup", error: "Face ID setup was cancelled." });
         return;
       }
-      const credentialId = bufferToBase64Url(credential.rawId);
       setString(storageKeys.faceIdCredentialId, credentialId);
       setAuthState({ status: "verified" });
     } catch (error) {
@@ -237,21 +261,8 @@ export default function Home() {
         setAuthState({ status: "needsSetup" });
         return;
       }
-      const publicKey: PublicKeyCredentialRequestOptions = {
-        challenge: createChallenge(),
-        allowCredentials: [
-          {
-            id: base64UrlToBuffer(credentialId),
-            type: "public-key"
-          }
-        ],
-        userVerification: "required",
-        timeout: 60000
-      };
-      const assertion = (await navigator.credentials.get({
-        publicKey
-      })) as PublicKeyCredential | null;
-      if (!assertion) {
+      const verified = await requestAssertion(credentialId);
+      if (!verified) {
         setAuthState({ status: "needsVerify", error: "Face ID verification was cancelled." });
         return;
       }
@@ -261,6 +272,28 @@ export default function Home() {
         status: "needsVerify",
         error: error instanceof Error ? error.message : "Face ID verification failed."
       });
+    }
+  };
+
+  const unlockCategory = async (categoryTitle: string) => {
+    try {
+      let credentialId = getString(storageKeys.faceIdCredentialId);
+      if (!credentialId) {
+        credentialId = await createCredentialId(userName || "User");
+        if (!credentialId) {
+          showMessage("Face ID setup failed", "error");
+          return;
+        }
+        setString(storageKeys.faceIdCredentialId, credentialId);
+      }
+      const verified = await requestAssertion(credentialId);
+      if (!verified) {
+        showMessage("Face ID verification failed", "error");
+        return;
+      }
+      setUnlockedCategories((prev) => ({ ...prev, [categoryTitle]: true }));
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : "Face ID verification failed", "error");
     }
   };
 
@@ -547,6 +580,8 @@ export default function Home() {
         <UserInfoForm
           isViewMode={isViewMode}
           userData={userData}
+          unlockedCategories={unlockedCategories}
+          onUnlockCategory={unlockCategory}
           onUpdateField={updateField}
           onSave={saveUserInfo}
           onSwitchToEdit={() => setIsViewMode(false)}
@@ -598,6 +633,8 @@ export default function Home() {
 type UserInfoFormProps = {
   isViewMode: boolean;
   userData: Record<string, string>;
+  unlockedCategories: Record<string, boolean>;
+  onUnlockCategory: (categoryTitle: string) => void;
   onUpdateField: (hint: string, value: string) => void;
   onSave: () => void;
   onSwitchToEdit: () => void;
@@ -611,6 +648,8 @@ type UserInfoFormProps = {
 function UserInfoForm({
   isViewMode,
   userData,
+  unlockedCategories,
+  onUnlockCategory,
   onUpdateField,
   onSave,
   onSwitchToEdit,
@@ -743,10 +782,12 @@ function UserInfoForm({
               key={category.title}
               category={category}
               isViewMode={isViewMode}
+              isUnlocked={Boolean(unlockedCategories[category.title])}
               userData={userData}
               onUpdateField={onUpdateField}
               categoryCompletion={categoryCompletion(category)}
               shouldShowField={shouldShowField}
+              onUnlock={() => onUnlockCategory(category.title)}
             />
           ) : null
         )}
@@ -775,32 +816,41 @@ function UserInfoForm({
 type CategorySectionProps = {
   category: CategoryConfig;
   isViewMode: boolean;
+  isUnlocked: boolean;
   userData: Record<string, string>;
   onUpdateField: (hint: string, value: string) => void;
   categoryCompletion: number;
   shouldShowField: (hint: string) => boolean;
+  onUnlock: () => void;
 };
 
 function CategorySection({
   category,
   isViewMode,
+  isUnlocked,
   userData,
   onUpdateField,
   categoryCompletion,
-  shouldShowField
+  shouldShowField,
+  onUnlock
 }: CategorySectionProps) {
   const Icon = category.icon;
+  const isLocked = isViewMode && !isUnlocked;
   return (
     <div
       className="overflow-hidden rounded-3xl border bg-white shadow-lg"
       style={{ borderColor: `${category.color}33` }}
     >
-      <div
+      <button
+        type="button"
         className="flex items-center justify-between px-5 py-4"
         style={{
           background: isViewMode
             ? `linear-gradient(135deg, ${category.color}26, ${category.color}0D)`
             : `${category.color}1A`
+        }}
+        onClick={() => {
+          if (isViewMode && !isUnlocked) onUnlock();
         }}
       >
         <div className="flex items-center gap-3">
@@ -829,20 +879,24 @@ function CategorySection({
             {categoryCompletion}/{category.fields.length}
           </span>
         ) : null}
-      </div>
-      <div className="space-y-3 px-5 py-5">
-        {category.fields.map((field) =>
-          shouldShowField(field.hint) ? (
-            <FieldRow
-              key={field.hint}
-              field={field}
-              isViewMode={isViewMode}
-              value={userData[field.hint] ?? ""}
-              onChange={(value) => onUpdateField(field.hint, value)}
-            />
-          ) : null
-        )}
-      </div>
+      </button>
+      {isLocked ? (
+        <div className="px-5 pb-5 text-sm text-black/50">Tap to unlock with Face ID</div>
+      ) : (
+        <div className="space-y-3 px-5 py-5">
+          {category.fields.map((field) =>
+            shouldShowField(field.hint) ? (
+              <FieldRow
+                key={field.hint}
+                field={field}
+                isViewMode={isViewMode}
+                value={userData[field.hint] ?? ""}
+                onChange={(value) => onUpdateField(field.hint, value)}
+              />
+            ) : null
+          )}
+        </div>
+      )}
     </div>
   );
 }
