@@ -297,6 +297,33 @@ export default function Home() {
     }
   };
 
+  const unlockAllCategories = async () => {
+    try {
+      let credentialId = getString(storageKeys.faceIdCredentialId);
+      if (!credentialId) {
+        credentialId = await createCredentialId(userName || "User");
+        if (!credentialId) {
+          showMessage("Face ID setup failed", "error");
+          return;
+        }
+        setString(storageKeys.faceIdCredentialId, credentialId);
+      }
+      const verified = await requestAssertion(credentialId);
+      if (!verified) {
+        showMessage("Face ID verification failed", "error");
+        return;
+      }
+      setUnlockedCategories(
+        fieldCategories.reduce<Record<string, boolean>>((acc, category) => {
+          acc[category.title] = true;
+          return acc;
+        }, {})
+      );
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : "Face ID verification failed", "error");
+    }
+  };
+
   const handleImagePick = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -609,6 +636,13 @@ export default function Home() {
           }}
         >
           <MdQrCode className="text-2xl" />
+        </button>
+        <button
+          className="fixed bottom-28 right-6 z-20 rounded-xl bg-purple-600 p-3 text-white shadow-lg shadow-black/20"
+          onClick={unlockAllCategories}
+          aria-label="Unlock all cards"
+        >
+          <MdPersonOutline className="text-2xl" />
         </button>
       </div>
 
