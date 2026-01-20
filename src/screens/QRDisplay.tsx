@@ -4,24 +4,46 @@ import { MdArrowBack, MdShare } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { getProfileImage, getUserData } from "../utils/storage";
 
+const labelByKey: Record<string, string> = {
+  firstName: "First Name",
+  lastName: "Last Name",
+  fatherName: "Father name",
+  motherName: "Mother name",
+  email: "Email",
+  phoneNumber: "Phone Number",
+  address: "Address",
+  permanentAddress: "Permanent Address",
+  website: "Website",
+  passportNumber: "Passport Number",
+  aadhaar: "Aadhaar",
+  dlNumber: "DL Number",
+  panCardNumber: "PAN Card Number",
+  upiAddress: "UPI Address (Paytm)",
+  linkedInUrl: "LinkedIn URL",
+  facebook: "Facebook",
+  skypeId: "Skype ID",
+  whatsappLink: "WhatsApp link to chat",
+  instagram: "Instagram"
+};
+
 const buildVCard = (userData: Record<string, string>) => {
-  const firstName = userData["First Name"] || userData["first_name"] || "";
-  const lastName = userData["Last Name"] || userData["last_name"] || "";
-  const email = userData["Email"] || userData["email"] || "";
-  const phone = userData["Phone Number"] || userData["phone"] || "";
-  const address = userData["Address"] || "";
-  const website = userData["Website"] || "";
-  const linkedIn = userData["LinkedIn URL"] || "";
-  const facebook = userData["Facebook"] || "";
-  const instagram = userData["Instagram"] || "";
-  const whatsapp = userData["WhatsApp link to chat"] || "";
-  const father = userData["Father name"] || "";
-  const mother = userData["Mother name"] || "";
-  const passport = userData["Passport Number"] || "";
-  const aadhaar = userData["Aadhaar"] || "";
-  const dl = userData["DL Number"] || "";
-  const pan = userData["PAN Card Number"] || "";
-  const upi = userData["UPI Address (Paytm)"] || "";
+  const firstName = userData["firstName"] || "";
+  const lastName = userData["lastName"] || "";
+  const email = userData["email"] || "";
+  const phone = userData["phoneNumber"] || "";
+  const address = userData["address"] || "";
+  const website = userData["website"] || "";
+  const linkedIn = userData["linkedInUrl"] || "";
+  const facebook = userData["facebook"] || "";
+  const instagram = userData["instagram"] || "";
+  const whatsapp = userData["whatsappLink"] || "";
+  const father = userData["fatherName"] || "";
+  const mother = userData["motherName"] || "";
+  const passport = userData["passportNumber"] || "";
+  const aadhaar = userData["aadhaar"] || "";
+  const dl = userData["dlNumber"] || "";
+  const pan = userData["panCardNumber"] || "";
+  const upi = userData["upiAddress"] || "";
 
   const lines = [
     "BEGIN:VCARD",
@@ -51,25 +73,25 @@ const buildVCard = (userData: Record<string, string>) => {
 };
 
 const iconForField = (field: string) => {
-  switch (field.toLowerCase()) {
-    case "first name":
-    case "last name":
+  switch (field) {
+    case "firstName":
+    case "lastName":
       return "👤";
     case "email":
       return "✉️";
-    case "phone number":
+    case "phoneNumber":
       return "📞";
     case "address":
       return "🏠";
     case "website":
       return "🌐";
-    case "linkedin url":
+    case "linkedInUrl":
       return "🔗";
     case "facebook":
       return "📘";
     case "instagram":
       return "📷";
-    case "whatsapp link to chat":
+    case "whatsappLink":
       return "💬";
     default:
       return "ℹ️";
@@ -125,10 +147,10 @@ export default function QRDisplay() {
               </div>
             )}
             <p className="text-2xl font-bold text-black/90">
-              {`${userData["First Name"] || ""} ${userData["Last Name"] || ""}`.trim()}
+              {`${userData["firstName"] || ""} ${userData["lastName"] || ""}`.trim()}
             </p>
-            {userData["Email"] ? (
-              <p className="text-sm text-black/50">{userData["Email"]}</p>
+            {userData["email"] ? (
+              <p className="text-sm text-black/50">{userData["email"]}</p>
             ) : null}
           </div>
         </div>
@@ -162,7 +184,7 @@ export default function QRDisplay() {
             {summary.slice(0, 5).map(([key, value]) => (
               <div key={key} className="flex items-center gap-3 text-sm text-black/80">
                 <span>{iconForField(key)}</span>
-                <span className="font-medium">{key}:</span>
+                <span className="font-medium">{labelByKey[key] ?? key}:</span>
                 <span className="truncate">{value}</span>
               </div>
             ))}

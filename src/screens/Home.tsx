@@ -47,7 +47,8 @@ import { Modal } from "../components/Modal";
 
 type FieldConfig = {
   icon: React.ComponentType<{ className?: string }>;
-  hint: string;
+  key: string;
+  label: string;
   required?: boolean;
 };
 
@@ -64,10 +65,10 @@ const fieldCategories: CategoryConfig[] = [
     icon: MdPerson,
     color: "#3b82f6",
     fields: [
-      { icon: MdPerson, hint: "First Name", required: true },
-      { icon: MdPerson, hint: "Last Name", required: true },
-      { icon: MdPersonOutline, hint: "Father name" },
-      { icon: MdPersonOutline, hint: "Mother name" }
+      { icon: MdPerson, key: "firstName", label: "First Name", required: true },
+      { icon: MdPerson, key: "lastName", label: "Last Name", required: true },
+      { icon: MdPersonOutline, key: "fatherName", label: "Father name" },
+      { icon: MdPersonOutline, key: "motherName", label: "Mother name" }
     ]
   },
   {
@@ -75,11 +76,11 @@ const fieldCategories: CategoryConfig[] = [
     icon: MdPhone,
     color: "#22c55e",
     fields: [
-      { icon: MdEmail, hint: "Email", required: true },
-      { icon: MdPhone, hint: "Phone Number", required: true },
-      { icon: MdHome, hint: "Address" },
-      { icon: MdLocationCity, hint: "Permanent Address" },
-      { icon: MdLanguage, hint: "Website" }
+      { icon: MdEmail, key: "email", label: "Email", required: true },
+      { icon: MdPhone, key: "phoneNumber", label: "Phone Number", required: true },
+      { icon: MdHome, key: "address", label: "Address" },
+      { icon: MdLocationCity, key: "permanentAddress", label: "Permanent Address" },
+      { icon: MdLanguage, key: "website", label: "Website" }
     ]
   },
   {
@@ -87,28 +88,28 @@ const fieldCategories: CategoryConfig[] = [
     icon: MdAccountBalance,
     color: "#f97316",
     fields: [
-      { icon: MdAccountBalance, hint: "Passport Number" },
-      { icon: MdCreditCard, hint: "Aadhaar" },
-      { icon: MdDirectionsCar, hint: "DL Number" },
-      { icon: MdAccountBalance, hint: "PAN Card Number" }
+      { icon: MdAccountBalance, key: "passportNumber", label: "Passport Number" },
+      { icon: MdCreditCard, key: "aadhaar", label: "Aadhaar" },
+      { icon: MdDirectionsCar, key: "dlNumber", label: "DL Number" },
+      { icon: MdAccountBalance, key: "panCardNumber", label: "PAN Card Number" }
     ]
   },
   {
     title: "Digital Payments",
     icon: MdPayment,
     color: "#a855f7",
-    fields: [{ icon: MdAccountBalanceWallet, hint: "UPI Address (Paytm)" }]
+    fields: [{ icon: MdAccountBalanceWallet, key: "upiAddress", label: "UPI Address (Paytm)" }]
   },
   {
     title: "Social Media",
     icon: MdShare,
     color: "#4f46e5",
     fields: [
-      { icon: MdLink, hint: "LinkedIn URL" },
-      { icon: MdFacebook, hint: "Facebook" },
-      { icon: MdVideoCall, hint: "Skype ID" },
-      { icon: MdChat, hint: "WhatsApp link to chat" },
-      { icon: MdCameraAlt, hint: "Instagram" }
+      { icon: MdLink, key: "linkedInUrl", label: "LinkedIn URL" },
+      { icon: MdFacebook, key: "facebook", label: "Facebook" },
+      { icon: MdVideoCall, key: "skypeId", label: "Skype ID" },
+      { icon: MdChat, key: "whatsappLink", label: "WhatsApp link to chat" },
+      { icon: MdCameraAlt, key: "instagram", label: "Instagram" }
     ]
   }
 ];
@@ -133,15 +134,9 @@ export default function Home() {
     setPinnedFields(getPinnedFields());
   }, []);
 
-  const userName = useMemo(
-    () => userData["First Name"] || userData["first_name"] || "User",
-    [userData]
-  );
+  const userName = useMemo(() => userData["firstName"] || "User", [userData]);
 
-  const userEmail = useMemo(
-    () => userData["Email"] || userData["email"] || "",
-    [userData]
-  );
+  const userEmail = useMemo(() => userData["email"] || "", [userData]);
 
   const showMessage = (text: string, tone: "ok" | "warn" | "error") => {
     setMessage({ text, tone });
@@ -163,16 +158,16 @@ export default function Home() {
     reader.readAsDataURL(file);
   };
 
-  const updateField = (hint: string, value: string) => {
-    setLocalUserData((prev) => ({ ...prev, [hint]: value }));
+  const updateField = (key: string, value: string) => {
+    setLocalUserData((prev) => ({ ...prev, [key]: value }));
   };
 
   const saveUserInfo = () => {
     const missingFields: string[] = [];
     fieldCategories.forEach((category) => {
       category.fields.forEach((field) => {
-        if (field.required && !userData[field.hint]?.trim()) {
-          missingFields.push(field.hint);
+        if (field.required && !userData[field.key]?.trim()) {
+          missingFields.push(field.label);
         }
       });
     });
@@ -203,14 +198,14 @@ export default function Home() {
     const filledFields = fieldCategories.reduce((sum, category) => {
       return (
         sum +
-        category.fields.filter((field) => userData[field.hint]?.trim().length).length
+        category.fields.filter((field) => userData[field.key]?.trim().length).length
       );
     }, 0);
     return totalFields ? filledFields / totalFields : 0;
   };
 
   const categoryCompletion = (category: CategoryConfig) =>
-    category.fields.filter((field) => userData[field.hint]?.trim().length).length;
+    category.fields.filter((field) => userData[field.key]?.trim().length).length;
 
   const hasAnyData = Object.values(userData).some((value) => value.trim().length > 0);
 
@@ -380,11 +375,11 @@ export default function Home() {
           userData={userData}
           profileImage={profileImage}
           pinnedFields={pinnedFields}
-          onTogglePin={(hint) => {
+          onTogglePin={(key) => {
             setPinnedFields((prev) => {
-              const updated = prev.includes(hint)
-                ? prev.filter((item) => item !== hint)
-                : [...prev, hint];
+              const updated = prev.includes(key)
+                ? prev.filter((item) => item !== key)
+                : [...prev, key];
               setPinnedFieldsStorage(updated);
               return updated;
             });
@@ -445,8 +440,8 @@ type UserInfoFormProps = {
   userData: Record<string, string>;
   profileImage: string;
   pinnedFields: string[];
-  onTogglePin: (hint: string) => void;
-  onUpdateField: (hint: string, value: string) => void;
+  onTogglePin: (key: string) => void;
+  onUpdateField: (key: string, value: string) => void;
   onSave: () => void;
   onSwitchToEdit: () => void;
   onShareQR: () => void;
@@ -473,27 +468,33 @@ function UserInfoForm({
 }: UserInfoFormProps) {
   const profileInputRef = useRef<HTMLInputElement | null>(null);
   const [quickInfoOpen, setQuickInfoOpen] = useState<{
-    hint: string;
+    key: string;
+    label: string;
     value: string;
     Icon: React.ComponentType<{ className?: string }>;
   } | null>(null);
 
-  const fieldIconMap = useMemo(() => {
+  const fieldConfigMap = useMemo(() => {
     const entries = fieldCategories.flatMap((category) =>
-      category.fields.map((field) => [field.hint, field.icon] as const)
+      category.fields.map((field) => [field.key, field] as const)
     );
     return new Map(entries);
   }, []);
 
   const pinnedQuickInfo = useMemo(() => {
     return pinnedFields
-      .map((hint) => {
-        const value = userData[hint]?.trim() ?? "";
-        const Icon = fieldIconMap.get(hint) ?? MdInfoOutline;
-        return { hint, value, Icon };
+      .map((key) => {
+        const value = userData[key]?.trim() ?? "";
+        const field = fieldConfigMap.get(key);
+        return {
+          key,
+          label: field?.label ?? key,
+          value,
+          Icon: field?.icon ?? MdInfoOutline
+        };
       })
       .filter((item) => item.value.length > 0);
-  }, [fieldIconMap, pinnedFields, userData]);
+  }, [fieldConfigMap, pinnedFields, userData]);
 
   const buildQuickAction = (
     icon: React.ComponentType<{ className?: string }>,
@@ -521,12 +522,12 @@ function UserInfoForm({
 
   const shouldShowCategory = (category: CategoryConfig) => {
     if (!isViewMode) return true;
-    return category.fields.some((field) => userData[field.hint]?.trim().length);
+    return category.fields.some((field) => userData[field.key]?.trim().length);
   };
 
-  const shouldShowField = (hint: string) => {
+  const shouldShowField = (key: string) => {
     if (!isViewMode) return true;
-    return Boolean(userData[hint]?.trim().length);
+    return Boolean(userData[key]?.trim().length);
   };
 
   return (
@@ -548,10 +549,10 @@ function UserInfoForm({
               )}
               <div className="flex-1">
                 <p className="text-2xl font-bold text-black/90">
-                  {userData["First Name"] || "User"}
+                  {userData["firstName"] || "User"}
                 </p>
                 <p className="text-sm font-medium text-black/50">
-                  {userData["Email"] || "Digital Identity Profile"}
+                  {userData["email"] || "Digital Identity Profile"}
                 </p>
               </div>
             </div>
@@ -564,10 +565,10 @@ function UserInfoForm({
               <div className="mt-3 flex flex-wrap gap-3">
                 {pinnedQuickInfo.map((item) => (
                   <button
-                    key={item.hint}
+                    key={item.key}
                     className="flex h-12 w-12 items-center justify-center rounded-2xl border border-black/5 bg-gradient-to-br from-white to-gray-50 text-purple-700 shadow-sm"
                     onClick={() => setQuickInfoOpen(item)}
-                    aria-label={`Open ${item.hint}`}
+                    aria-label={`Open ${item.label}`}
                   >
                     <item.Icon className="text-xl" />
                   </button>
@@ -677,7 +678,7 @@ function UserInfoForm({
               <quickInfoOpen.Icon className="text-3xl" />
             </div>
             <p className="text-sm font-semibold uppercase tracking-wide text-black/40">
-              {quickInfoOpen.hint}
+              {quickInfoOpen.label}
             </p>
             <p className="break-words text-2xl font-semibold text-black/90">
               {quickInfoOpen.value}
@@ -685,7 +686,7 @@ function UserInfoForm({
             <button
               className="absolute -bottom-3 -right-3 bg-transparent p-2 text-black/60 shadow-none hover:bg-transparent focus:outline-none focus-visible:outline-none"
               onClick={() => navigator.clipboard.writeText(quickInfoOpen.value)}
-              aria-label={`Copy ${quickInfoOpen.hint}`}
+              aria-label={`Copy ${quickInfoOpen.label}`}
             >
               <MdContentCopy />
             </button>
@@ -700,11 +701,11 @@ type CategorySectionProps = {
   category: CategoryConfig;
   isViewMode: boolean;
   userData: Record<string, string>;
-  onUpdateField: (hint: string, value: string) => void;
+  onUpdateField: (key: string, value: string) => void;
   pinnedFields: string[];
-  onTogglePin: (hint: string) => void;
+  onTogglePin: (key: string) => void;
   categoryCompletion: number;
-  shouldShowField: (hint: string) => boolean;
+  shouldShowField: (key: string) => boolean;
 };
 
 function CategorySection({
@@ -760,15 +761,15 @@ function CategorySection({
       </div>
       <div className="space-y-3 px-5 py-5">
         {category.fields.map((field) =>
-          shouldShowField(field.hint) ? (
+          shouldShowField(field.key) ? (
             <FieldRow
-              key={field.hint}
+              key={field.key}
               field={field}
               isViewMode={isViewMode}
-              value={userData[field.hint] ?? ""}
-              onChange={(value) => onUpdateField(field.hint, value)}
-              isPinned={pinnedFields.includes(field.hint)}
-              onTogglePin={() => onTogglePin(field.hint)}
+              value={userData[field.key] ?? ""}
+              onChange={(value) => onUpdateField(field.key, value)}
+              isPinned={pinnedFields.includes(field.key)}
+              onTogglePin={() => onTogglePin(field.key)}
             />
           ) : null
         )}
@@ -813,7 +814,9 @@ function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }:
             <Icon className="text-lg" />
           </div>
           <div className="flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-black/40">{field.hint}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-black/40">
+              {field.label}
+            </p>
             <p className="text-base font-semibold text-black/80">{value}</p>
           </div>
           <button
@@ -823,7 +826,7 @@ function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }:
               if (!value) return;
               onTogglePin();
             }}
-            aria-label={`${isPinned ? "Unpin" : "Pin"} ${field.hint}`}
+            aria-label={`${isPinned ? "Unpin" : "Pin"} ${field.label}`}
             aria-pressed={isPinned}
           >
             {isPinned ? <MdPushPin /> : <MdOutlinePushPin />}
@@ -835,7 +838,7 @@ function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }:
               if (!value) return;
               navigator.clipboard.writeText(value);
             }}
-            aria-label={`Copy ${field.hint}`}
+            aria-label={`Copy ${field.label}`}
           >
             <MdContentCopy />
           </button>
@@ -845,7 +848,9 @@ function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }:
             <div className="rounded-2xl bg-gradient-to-br from-purple-700 to-purple-400 p-4 text-white shadow-sm">
               <Icon className="text-3xl" />
             </div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-black/40">{field.hint}</p>
+            <p className="text-sm font-semibold uppercase tracking-wide text-black/40">
+              {field.label}
+            </p>
             <p className="break-words text-2xl font-semibold text-black/90">{value}</p>
             <button
               className="absolute -bottom-3 -right-3 bg-transparent p-2 text-black/60 shadow-none hover:bg-transparent focus:outline-none focus-visible:outline-none"
@@ -853,7 +858,7 @@ function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }:
                 if (!value) return;
                 navigator.clipboard.writeText(value);
               }}
-              aria-label={`Copy ${field.hint}`}
+              aria-label={`Copy ${field.label}`}
             >
               <MdContentCopy />
             </button>
@@ -868,7 +873,7 @@ function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }:
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder={`${field.hint}${field.required ? " *" : ""}`}
+        placeholder={`${field.label}${field.required ? " *" : ""}`}
         className="w-full rounded-xl bg-[#F3EFEF] px-12 py-3 text-sm text-black placeholder-black/40 outline-none focus:ring-2 focus:ring-purple-700"
       />
       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-700">
@@ -879,7 +884,7 @@ function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }:
           <button
             className="rounded-md p-1 text-purple-700"
             onClick={() => navigator.clipboard.writeText(value)}
-            aria-label={`Copy ${field.hint}`}
+            aria-label={`Copy ${field.label}`}
           >
             <MdContentCopy />
           </button>
@@ -888,7 +893,7 @@ function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }:
           <button
             className="rounded-md p-1 text-black/40"
             onClick={() => onChange("")}
-            aria-label={`Clear ${field.hint}`}
+            aria-label={`Clear ${field.label}`}
           >
             <MdClear />
           </button>
