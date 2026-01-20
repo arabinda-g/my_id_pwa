@@ -37,14 +37,6 @@ const buildVCard = (userData: Record<string, string>) => {
   const facebook = userData["facebook"] || "";
   const instagram = userData["instagram"] || "";
   const whatsapp = userData["whatsappLink"] || "";
-  const father = userData["fatherName"] || "";
-  const mother = userData["motherName"] || "";
-  const passport = userData["passportNumber"] || "";
-  const aadhaar = userData["aadhaar"] || "";
-  const dl = userData["dlNumber"] || "";
-  const pan = userData["panCardNumber"] || "";
-  const upi = userData["upiAddress"] || "";
-
   const lines = [
     "BEGIN:VCARD",
     "VERSION:3.0",
@@ -57,13 +49,6 @@ const buildVCard = (userData: Record<string, string>) => {
     facebook ? `X-SOCIALPROFILE;TYPE=facebook:${facebook}` : "",
     instagram ? `X-SOCIALPROFILE;TYPE=instagram:${instagram}` : "",
     whatsapp ? `X-SOCIALPROFILE;TYPE=whatsapp:${whatsapp}` : "",
-    father ? `X-FATHER:${father}` : "",
-    mother ? `X-MOTHER:${mother}` : "",
-    passport ? `X-PASSPORT:${passport}` : "",
-    aadhaar ? `X-AADHAAR:${aadhaar}` : "",
-    dl ? `X-DL:${dl}` : "",
-    pan ? `X-PAN:${pan}` : "",
-    upi ? `X-UPI:${upi}` : "",
     "END:VCARD"
   ]
     .filter(Boolean)
@@ -103,6 +88,15 @@ export default function QRDisplay() {
   const [userData, setUserData] = useState<Record<string, string>>({});
   const [isGenerating, setIsGenerating] = useState(true);
   const [profileImage, setProfileImage] = useState("");
+  const hiddenSummaryFields = new Set([
+    "fatherName",
+    "motherName",
+    "passportNumber",
+    "aadhaar",
+    "dlNumber",
+    "panCardNumber",
+    "upiAddress"
+  ]);
 
   useEffect(() => {
     const data = getUserData();
@@ -112,7 +106,9 @@ export default function QRDisplay() {
   }, []);
 
   const qrData = useMemo(() => buildVCard(userData), [userData]);
-  const summary = Object.entries(userData).filter(([, value]) => value?.trim());
+  const summary = Object.entries(userData).filter(
+    ([key, value]) => value?.trim() && !hiddenSummaryFields.has(key)
+  );
 
   return (
     <div className="min-h-screen bg-[#F3EFEF] text-black">
