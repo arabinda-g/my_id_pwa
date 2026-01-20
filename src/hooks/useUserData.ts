@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchRemoteUser } from "../data/remote";
 import { sampleUser } from "../data/seed";
 import {
   getAllUsers,
@@ -25,15 +24,8 @@ export function useUserData() {
         return;
       }
 
-      try {
-        const remote = await fetchRemoteUser();
-        const saved = await upsertUser(remote);
-        setUser(saved);
-      } catch (fetchError) {
-        const saved = await upsertUser({ ...sampleUser, updatedAt: Date.now() });
-        setUser(saved);
-        console.warn("Remote fetch failed, using sample data.", fetchError);
-      }
+      const saved = await upsertUser({ ...sampleUser, updatedAt: Date.now() });
+      setUser(saved);
     } catch (err) {
       console.error(err);
       setError("Unable to load profile data.");
