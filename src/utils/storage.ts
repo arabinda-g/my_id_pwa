@@ -1,7 +1,8 @@
 export const storageKeys = {
   hasSeenGetStarted: "has_seen_get_started",
   userData: "user_data",
-  profileImage: "profile_image"
+  profileImage: "profile_image",
+  pinnedFields: "pinned_fields"
 };
 
 export function getBoolean(key: string, fallback = false) {
@@ -39,6 +40,25 @@ export function setUserData(data: Record<string, string>) {
 
 export function clearUserData() {
   localStorage.removeItem(storageKeys.userData);
+}
+
+export function getPinnedFields(): string[] {
+  const raw = localStorage.getItem(storageKeys.pinnedFields);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as string[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setPinnedFields(fields: string[]) {
+  localStorage.setItem(storageKeys.pinnedFields, JSON.stringify(fields));
+}
+
+export function clearPinnedFields() {
+  localStorage.removeItem(storageKeys.pinnedFields);
 }
 
 export function getProfileImage() {

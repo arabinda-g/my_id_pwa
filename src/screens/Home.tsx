@@ -25,6 +25,8 @@ import {
   MdPerson,
   MdPersonOutline,
   MdPhone,
+  MdPushPin,
+  MdOutlinePushPin,
   MdQrCode,
   MdQrCodeScanner,
   MdSave,
@@ -32,10 +34,13 @@ import {
   MdVideoCall
 } from "react-icons/md";
 import {
+  clearPinnedFields,
   clearUserData,
+  getPinnedFields,
   getProfileImage,
   getUserData,
   setProfileImage,
+  setPinnedFields as setPinnedFieldsStorage,
   setUserData
 } from "../utils/storage";
 import { Modal } from "../components/Modal";
@@ -115,6 +120,7 @@ export default function Home() {
   const [isViewMode, setIsViewMode] = useState(false);
   const [userData, setLocalUserData] = useState<Record<string, string>>({});
   const [profileImage, setLocalProfileImage] = useState("");
+  const [pinnedFields, setPinnedFields] = useState<string[]>([]);
   const [message, setMessage] = useState<{ text: string; tone: "ok" | "warn" | "error" } | null>(
     null
   );
@@ -124,6 +130,7 @@ export default function Home() {
     setLocalUserData(data);
     setIsViewMode(Object.values(data).some((value) => value.trim().length > 0));
     setLocalProfileImage(getProfileImage());
+    setPinnedFields(getPinnedFields());
   }, []);
 
   const userName = useMemo(
@@ -211,7 +218,8 @@ export default function Home() {
     const data = getUserData();
     const exportPayload = {
       userData: data,
-      profileImage: getProfileImage()
+      profileImage: getProfileImage(),
+      pinnedFields: getPinnedFields()
     };
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
       type: "application/json"
@@ -233,14 +241,21 @@ export default function Home() {
       if (!parsed || typeof parsed !== "object") {
         throw new Error("Invalid profile data");
       }
-      const parsedObject = parsed as { userData?: Record<string, string>; profileImage?: string };
+      const parsedObject = parsed as {
+        userData?: Record<string, string>;
+        profileImage?: string;
+        pinnedFields?: string[];
+      };
       const hasUserData = Object.prototype.hasOwnProperty.call(parsedObject, "userData");
       const data = hasUserData ? parsedObject.userData ?? {} : (parsed as Record<string, string>);
       const image = hasUserData ? parsedObject.profileImage ?? "" : "";
+      const pinned = hasUserData ? parsedObject.pinnedFields ?? [] : [];
       setUserData(data);
+      setPinnedFieldsStorage(pinned);
       setLocalUserData(data);
       setProfileImage(image);
       setLocalProfileImage(image);
+      setPinnedFields(pinned);
       setIsViewMode(Object.values(data).some((value) => value.trim().length > 0));
       showMessage("Profile imported", "ok");
     } catch {
@@ -252,9 +267,11 @@ export default function Home() {
 
   const handleClear = () => {
     clearUserData();
+    clearPinnedFields();
     setProfileImage("");
     setLocalUserData({});
     setIsViewMode(false);
+    setPinnedFields([]);
     showMessage("Profile cleared", "ok");
   };
 
@@ -362,6 +379,16 @@ export default function Home() {
           isViewMode={isViewMode}
           userData={userData}
           profileImage={profileImage}
+          pinnedFields={pinnedFields}
+          onTogglePin={(hint) => {
+            setPinnedFields((prev) => {
+              const updated = prev.includes(hint)
+                ? prev.filter((item) => item !== hint)
+                : [...prev, hint];
+              setPinnedFieldsStorage(updated);
+              return updated;
+            });
+          }}
           onUpdateField={updateField}
           onSave={saveUserInfo}
           onSwitchToEdit={() => setIsViewMode(false)}
@@ -417,6 +444,8 @@ type UserInfoFormProps = {
   isViewMode: boolean;
   userData: Record<string, string>;
   profileImage: string;
+  pinnedFields: string[];
+  onTogglePin: (hint: string) => void;
   onUpdateField: (hint: string, value: string) => void;
   onSave: () => void;
   onSwitchToEdit: () => void;
@@ -431,6 +460,8 @@ function UserInfoForm({
   isViewMode,
   userData,
   profileImage,
+  pinnedFields,
+  onTogglePin,
   onUpdateField,
   onSave,
   onSwitchToEdit,
@@ -441,29 +472,28 @@ function UserInfoForm({
   onClearImage
 }: UserInfoFormProps) {
   const profileInputRef = useRef<HTMLInputElement | null>(null);
+  const [quickInfoOpen, setQuickInfoOpen] = useState<{
+    hint: string;
+    value: string;
+    Icon: React.ComponentType<{ className?: string }>;
+  } | null>(null);
 
-  const buildQuickInfo = (
-    icon: React.ComponentType<{ className?: string }>,
-    label: string,
-    value: string,
-    color: string
-  ) => {
-    const Icon = icon;
-    return (
-      <div
-        className="rounded-xl border px-3 py-3 text-left"
-        style={{ borderColor: `${color}33`, backgroundColor: `${color}1A` }}
-      >
-        <div className="flex items-center gap-2 text-xs font-semibold" style={{ color }}>
-          <Icon className="text-sm" />
-          {label}
-        </div>
-        <p className="mt-2 text-sm font-medium text-black/80">
-          {value.length > 20 ? `${value.slice(0, 20)}...` : value}
-        </p>
-      </div>
+  const fieldIconMap = useMemo(() => {
+    const entries = fieldCategories.flatMap((category) =>
+      category.fields.map((field) => [field.hint, field.icon] as const)
     );
-  };
+    return new Map(entries);
+  }, []);
+
+  const pinnedQuickInfo = useMemo(() => {
+    return pinnedFields
+      .map((hint) => {
+        const value = userData[hint]?.trim() ?? "";
+        const Icon = fieldIconMap.get(hint) ?? MdInfoOutline;
+        return { hint, value, Icon };
+      })
+      .filter((item) => item.value.length > 0);
+  }, [fieldIconMap, pinnedFields, userData]);
 
   const buildQuickAction = (
     icon: React.ComponentType<{ className?: string }>,
@@ -531,9 +561,17 @@ function UserInfoForm({
                 <MdInfoOutline />
                 <p className="text-base font-semibold">Quick Info</p>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                {buildQuickInfo(MdPhone, "Phone", userData["Phone Number"] || "Not provided", "#22c55e")}
-                {buildQuickInfo(MdHome, "Location", userData["Address"] || "Not provided", "#3b82f6")}
+              <div className="mt-3 flex flex-wrap gap-3">
+                {pinnedQuickInfo.map((item) => (
+                  <button
+                    key={item.hint}
+                    className="flex h-12 w-12 items-center justify-center rounded-2xl border border-black/5 bg-gradient-to-br from-white to-gray-50 text-purple-700 shadow-sm"
+                    onClick={() => setQuickInfoOpen(item)}
+                    aria-label={`Open ${item.hint}`}
+                  >
+                    <item.Icon className="text-xl" />
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -607,6 +645,8 @@ function UserInfoForm({
               isViewMode={isViewMode}
               userData={userData}
               onUpdateField={onUpdateField}
+              pinnedFields={pinnedFields}
+              onTogglePin={onTogglePin}
               categoryCompletion={categoryCompletion(category)}
               shouldShowField={shouldShowField}
             />
@@ -630,6 +670,28 @@ function UserInfoForm({
           {isViewMode ? "Edit Profile" : "Save Profile"}
         </button>
       </div>
+      <Modal isOpen={Boolean(quickInfoOpen)} onClose={() => setQuickInfoOpen(null)}>
+        {quickInfoOpen ? (
+          <div className="relative flex flex-col items-center gap-4 text-center">
+            <div className="rounded-2xl bg-gradient-to-br from-purple-700 to-purple-400 p-4 text-white shadow-sm">
+              <quickInfoOpen.Icon className="text-3xl" />
+            </div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-black/40">
+              {quickInfoOpen.hint}
+            </p>
+            <p className="break-words text-2xl font-semibold text-black/90">
+              {quickInfoOpen.value}
+            </p>
+            <button
+              className="absolute -bottom-3 -right-3 bg-transparent p-2 text-black/60 shadow-none hover:bg-transparent focus:outline-none focus-visible:outline-none"
+              onClick={() => navigator.clipboard.writeText(quickInfoOpen.value)}
+              aria-label={`Copy ${quickInfoOpen.hint}`}
+            >
+              <MdContentCopy />
+            </button>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }
@@ -639,6 +701,8 @@ type CategorySectionProps = {
   isViewMode: boolean;
   userData: Record<string, string>;
   onUpdateField: (hint: string, value: string) => void;
+  pinnedFields: string[];
+  onTogglePin: (hint: string) => void;
   categoryCompletion: number;
   shouldShowField: (hint: string) => boolean;
 };
@@ -648,6 +712,8 @@ function CategorySection({
   isViewMode,
   userData,
   onUpdateField,
+  pinnedFields,
+  onTogglePin,
   categoryCompletion,
   shouldShowField
 }: CategorySectionProps) {
@@ -701,6 +767,8 @@ function CategorySection({
               isViewMode={isViewMode}
               value={userData[field.hint] ?? ""}
               onChange={(value) => onUpdateField(field.hint, value)}
+              isPinned={pinnedFields.includes(field.hint)}
+              onTogglePin={() => onTogglePin(field.hint)}
             />
           ) : null
         )}
@@ -714,9 +782,11 @@ type FieldRowProps = {
   isViewMode: boolean;
   value: string;
   onChange: (value: string) => void;
+  isPinned: boolean;
+  onTogglePin: () => void;
 };
 
-function FieldRow({ field, isViewMode, value, onChange }: FieldRowProps) {
+function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }: FieldRowProps) {
   const Icon = field.icon;
   const [isZoomOpen, setIsZoomOpen] = useState(false);
 
@@ -746,6 +816,18 @@ function FieldRow({ field, isViewMode, value, onChange }: FieldRowProps) {
             <p className="text-xs font-semibold uppercase tracking-wide text-black/40">{field.hint}</p>
             <p className="text-base font-semibold text-black/80">{value}</p>
           </div>
+          <button
+            className={`rounded-lg p-2 ${isPinned ? "bg-purple-100 text-purple-700" : "bg-black/5 text-black/50"}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (!value) return;
+              onTogglePin();
+            }}
+            aria-label={`${isPinned ? "Unpin" : "Pin"} ${field.hint}`}
+            aria-pressed={isPinned}
+          >
+            {isPinned ? <MdPushPin /> : <MdOutlinePushPin />}
+          </button>
           <button
             className="rounded-lg bg-black/5 p-2 text-black/50"
             onClick={(event) => {
