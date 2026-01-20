@@ -38,6 +38,7 @@ import {
   setProfileImage,
   setUserData
 } from "../utils/storage";
+import { Modal } from "../components/Modal";
 
 type FieldConfig = {
   icon: React.ComponentType<{ className?: string }>;
@@ -717,28 +718,66 @@ type FieldRowProps = {
 
 function FieldRow({ field, isViewMode, value, onChange }: FieldRowProps) {
   const Icon = field.icon;
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
 
   if (isViewMode) {
     return (
-      <div className="flex items-center gap-4 rounded-2xl border border-black/5 bg-gradient-to-br from-white to-gray-50 p-4 shadow-md shadow-black/10">
-        <div className="rounded-xl bg-gradient-to-br from-purple-700 to-purple-400 p-3 text-white shadow-sm">
-          <Icon className="text-lg" />
-        </div>
-        <div className="flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-black/40">{field.hint}</p>
-          <p className="text-base font-semibold text-black/80">{value}</p>
-        </div>
-        <button
-          className="rounded-lg bg-black/5 p-2 text-black/50"
+      <>
+        <div
+          className="flex items-center gap-4 rounded-2xl border border-black/5 bg-gradient-to-br from-white to-gray-50 p-4 shadow-md shadow-black/10"
+          role={value ? "button" : undefined}
+          tabIndex={value ? 0 : -1}
           onClick={() => {
             if (!value) return;
-            navigator.clipboard.writeText(value);
+            setIsZoomOpen(true);
           }}
-          aria-label={`Copy ${field.hint}`}
+          onKeyDown={(event) => {
+            if (!value) return;
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setIsZoomOpen(true);
+            }
+          }}
         >
-          <MdContentCopy />
-        </button>
-      </div>
+          <div className="rounded-xl bg-gradient-to-br from-purple-700 to-purple-400 p-3 text-white shadow-sm">
+            <Icon className="text-lg" />
+          </div>
+          <div className="flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-black/40">{field.hint}</p>
+            <p className="text-base font-semibold text-black/80">{value}</p>
+          </div>
+          <button
+            className="rounded-lg bg-black/5 p-2 text-black/50"
+            onClick={(event) => {
+              event.stopPropagation();
+              if (!value) return;
+              navigator.clipboard.writeText(value);
+            }}
+            aria-label={`Copy ${field.hint}`}
+          >
+            <MdContentCopy />
+          </button>
+        </div>
+        <Modal isOpen={isZoomOpen} onClose={() => setIsZoomOpen(false)}>
+          <div className="relative flex flex-col items-center gap-4 text-center">
+            <div className="rounded-2xl bg-gradient-to-br from-purple-700 to-purple-400 p-4 text-white shadow-sm">
+              <Icon className="text-3xl" />
+            </div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-black/40">{field.hint}</p>
+            <p className="break-words text-2xl font-semibold text-black/90">{value}</p>
+            <button
+              className="absolute -bottom-3 -right-3 bg-transparent p-2 text-black/60 shadow-none hover:bg-transparent focus:outline-none focus-visible:outline-none"
+              onClick={() => {
+                if (!value) return;
+                navigator.clipboard.writeText(value);
+              }}
+              aria-label={`Copy ${field.hint}`}
+            >
+              <MdContentCopy />
+            </button>
+          </div>
+        </Modal>
+      </>
     );
   }
 
