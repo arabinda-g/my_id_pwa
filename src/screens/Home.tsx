@@ -41,6 +41,7 @@ import {
   setUserData
 } from "../utils/storage";
 import { Modal } from "../components/Modal";
+import { QrModal } from "../components/QrModal";
 
 type FieldConfig = {
   icon: React.ComponentType<{ className?: string }>;
@@ -120,6 +121,37 @@ const formatAadhaarNumber = (input: string) => {
   return groups ? groups.join(" ") : digits;
 };
 
+const buildVCard = (userData: Record<string, string>) => {
+  const firstName = userData["firstName"] || "";
+  const lastName = userData["lastName"] || "";
+  const email = userData["email"] || "";
+  const phone = userData["phoneNumber"] || "";
+  const address = userData["address"] || "";
+  const website = userData["website"] || "";
+  const linkedIn = userData["linkedInUrl"] || "";
+  const facebook = userData["facebook"] || "";
+  const instagram = userData["instagram"] || "";
+  const whatsapp = userData["whatsappLink"] || "";
+  const lines = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `FN:${[firstName, lastName].filter(Boolean).join(" ")}`.trim(),
+    email ? `EMAIL:${email}` : "",
+    phone ? `TEL:${phone}` : "",
+    address ? `ADR:;;${address};;;;` : "",
+    website ? `URL:${website}` : "",
+    linkedIn ? `X-SOCIALPROFILE;TYPE=linkedin:${linkedIn}` : "",
+    facebook ? `X-SOCIALPROFILE;TYPE=facebook:${facebook}` : "",
+    instagram ? `X-SOCIALPROFILE;TYPE=instagram:${instagram}` : "",
+    whatsapp ? `X-SOCIALPROFILE;TYPE=whatsapp:${whatsapp}` : "",
+    "END:VCARD"
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return lines;
+};
+
 const fieldCategories: CategoryConfig[] = [
   {
     title: "Personal Information",
@@ -184,6 +216,7 @@ export default function Home() {
   const [profileImage, setLocalProfileImage] = useState("");
   const [pinnedFields, setPinnedFields] = useState<string[]>([]);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+  const [isQrOpen, setIsQrOpen] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "ok" | "warn" | "error" } | null>(
     null
   );
@@ -275,6 +308,7 @@ export default function Home() {
     category.fields.filter((field) => userData[field.key]?.trim().length).length;
 
   const hasAnyData = Object.values(userData).some((value) => value.trim().length > 0);
+  const qrData = useMemo(() => buildVCard(userData), [userData]);
 
   const handleExport = () => {
     const data = getUserData();
@@ -386,7 +420,7 @@ export default function Home() {
                     showMessage("Please save your information first", "warn");
                     return;
                   }
-                  navigate("/qr");
+                  setIsQrOpen(true);
                 }}
               >
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-100 text-green-700 shadow-sm">
@@ -497,7 +531,7 @@ export default function Home() {
               showMessage("Please save your information first", "warn");
               return;
             }
-            navigate("/qr");
+            setIsQrOpen(true);
           }}
           completionPercentage={completionPercentage()}
           categoryCompletion={categoryCompletion}
@@ -524,6 +558,7 @@ export default function Home() {
           {message.text}
         </div>
       ) : null}
+      <QrModal isOpen={isQrOpen} onClose={() => setIsQrOpen(false)} qrData={qrData} />
       <Modal isOpen={isClearConfirmOpen} onClose={() => setIsClearConfirmOpen(false)}>
         <div className="flex flex-col gap-4 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-700">

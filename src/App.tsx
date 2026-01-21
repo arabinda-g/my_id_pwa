@@ -3,7 +3,6 @@ import { Route, Routes } from "react-router-dom";
 import FrontPage from "./screens/FrontPage";
 import Home from "./screens/Home";
 import NotFound from "./screens/NotFound";
-import QRDisplay from "./screens/QRDisplay";
 import QRScanner from "./screens/QRScanner";
 import { getBoolean, setBoolean, storageKeys } from "./utils/storage";
 
@@ -38,7 +37,6 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
-      <Route path="/qr" element={<QRDisplay />} />
       <Route path="/scan" element={<QRScanner />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
