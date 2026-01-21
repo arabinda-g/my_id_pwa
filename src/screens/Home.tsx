@@ -630,29 +630,23 @@ export default function Home() {
           <div className="text-xs font-semibold uppercase tracking-widest text-black/50">
             Quick actions
           </div>
-          <div className="mt-4">
-            <button
-              className="flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-4 text-base font-semibold text-white shadow-lg"
-              style={{
-                background: isViewMode
-                  ? "linear-gradient(135deg, #f97316, #fdba74)"
-                  : "linear-gradient(135deg, #7c3aed, #a855f7)"
-              }}
-              onClick={() => {
-                setIsDrawerOpen(false);
-                if (isViewMode) {
+          {isViewMode ? (
+            <div className="mt-4">
+              <button
+                className="flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-4 text-base font-semibold text-white shadow-lg"
+                style={{ background: "linear-gradient(135deg, #f97316, #fdba74)" }}
+                onClick={() => {
+                  setIsDrawerOpen(false);
                   setIsViewMode(false);
-                } else {
-                  saveUserInfo();
-                }
-              }}
-            >
-              <span className="rounded-lg bg-white/20 p-2">
-                {isViewMode ? <MdEdit className="text-lg" /> : <MdSave className="text-lg" />}
-              </span>
-              {isViewMode ? "Edit Profile" : "Save Profile"}
-            </button>
-          </div>
+                }}
+              >
+                <span className="rounded-lg bg-white/20 p-2">
+                  <MdEdit className="text-lg" />
+                </span>
+                Edit Profile
+              </button>
+            </div>
+          ) : null}
           <div className="mt-3 space-y-4">
             <div className="rounded-2xl bg-black/[0.03] p-2 shadow-sm">
               <button
@@ -774,6 +768,8 @@ export default function Home() {
             setPinnedFields(normalized);
           }}
           onUpdateField={updateField}
+          onSave={saveUserInfo}
+          onSwitchToEdit={() => setIsViewMode(false)}
           onShareQR={() => {
             if (!hasAnyData) {
               showMessage("Please save your information first", "warn");
@@ -962,6 +958,8 @@ type UserInfoFormProps = {
   onTogglePin: (key: string) => void;
   onReorderPinned: (fields: string[]) => void;
   onUpdateField: (key: string, value: string) => void;
+  onSave: () => void;
+  onSwitchToEdit: () => void;
   onShareQR: () => void;
   completionPercentage: number;
   categoryCompletion: (category: CategoryConfig) => number;
@@ -980,6 +978,8 @@ function UserInfoForm({
   onTogglePin,
   onReorderPinned,
   onUpdateField,
+  onSave,
+  onSwitchToEdit,
   onShareQR,
   completionPercentage,
   categoryCompletion,
@@ -1304,6 +1304,20 @@ function UserInfoForm({
           ) : null
         )}
       </div>
+      {!isViewMode ? (
+        <div className="mt-6">
+          <button
+            className="flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-4 text-lg font-semibold text-white shadow-lg"
+            style={{ background: "linear-gradient(135deg, #7c3aed, #a855f7)" }}
+            onClick={onSave}
+          >
+            <span className="rounded-lg bg-white/20 p-2">
+              <MdSave className="text-xl" />
+            </span>
+            Save Profile
+          </button>
+        </div>
+      ) : null}
 
       <Modal isOpen={Boolean(quickInfoOpen)} onClose={() => setQuickInfoOpen(null)}>
         {quickInfoOpen ? (
