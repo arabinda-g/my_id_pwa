@@ -864,6 +864,7 @@ function UserInfoForm({
               onTogglePin={onTogglePin}
               categoryCompletion={categoryCompletion(category)}
               shouldShowField={shouldShowField}
+              fullNameValue={fullNameValue}
             />
           ) : null
         )}
@@ -915,6 +916,7 @@ type CategorySectionProps = {
   onTogglePin: (key: string) => void;
   categoryCompletion: number;
   shouldShowField: (key: string) => boolean;
+  fullNameValue: string;
 };
 
 function CategorySection({
@@ -925,7 +927,8 @@ function CategorySection({
   pinnedFields,
   onTogglePin,
   categoryCompletion,
-  shouldShowField
+  shouldShowField,
+  fullNameValue
 }: CategorySectionProps) {
   const Icon = category.icon;
   const isPinnedField = (key: string) =>
@@ -981,6 +984,7 @@ function CategorySection({
               onChange={(value) => onUpdateField(field.key, value)}
               isPinned={isPinnedField(field.key)}
               onTogglePin={() => onTogglePin(field.key)}
+              fullNameValue={fullNameValue}
             />
           ) : null
         )}
@@ -996,26 +1000,38 @@ type FieldRowProps = {
   onChange: (value: string) => void;
   isPinned: boolean;
   onTogglePin: () => void;
+  fullNameValue: string;
 };
 
-function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }: FieldRowProps) {
+function FieldRow({
+  field,
+  isViewMode,
+  value,
+  onChange,
+  isPinned,
+  onTogglePin,
+  fullNameValue
+}: FieldRowProps) {
   const Icon = field.icon;
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const displayValue = field.key === "phoneNumber" ? formatPhoneNumber(value) : value;
+  const isName = isNameField(field.key);
+  const modalValue = isName ? fullNameValue : displayValue;
+  const canOpenModal = isName ? Boolean(fullNameValue) : Boolean(value);
 
   if (isViewMode) {
     return (
       <>
         <div
           className="flex items-center gap-4 rounded-2xl border border-black/5 bg-gradient-to-br from-white to-gray-50 p-4 shadow-md shadow-black/10"
-          role={value ? "button" : undefined}
-          tabIndex={value ? 0 : -1}
+          role={canOpenModal ? "button" : undefined}
+          tabIndex={canOpenModal ? 0 : -1}
           onClick={() => {
-            if (!value) return;
+            if (!canOpenModal) return;
             setIsZoomOpen(true);
           }}
           onKeyDown={(event) => {
-            if (!value) return;
+            if (!canOpenModal) return;
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
               setIsZoomOpen(true);
@@ -1061,9 +1077,9 @@ function FieldRow({ field, isViewMode, value, onChange, isPinned, onTogglePin }:
               <Icon className="text-3xl" />
             </div>
             <p className="text-sm font-semibold uppercase tracking-wide text-black/40">
-              {field.label}
+              {isName ? "Name" : field.label}
             </p>
-            <p className="break-words text-2xl font-semibold text-black/90">{displayValue}</p>
+            <p className="break-words text-2xl font-semibold text-black/90">{modalValue}</p>
           </div>
         </Modal>
       </>
