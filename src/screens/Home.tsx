@@ -395,9 +395,6 @@ export default function Home() {
                   <MdQrCode className="text-lg" />
                 </span>
                 <span className="flex-1">QR Code</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-green-700/80">
-                  Share
-                </span>
               </button>
               <button
                 className="group mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-white"
@@ -410,9 +407,6 @@ export default function Home() {
                   <MdQrCodeScanner className="text-lg" />
                 </span>
                 <span className="flex-1">Scan QR</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-700/80">
-                  Import
-                </span>
               </button>
             </div>
 
@@ -425,9 +419,6 @@ export default function Home() {
                   <MdFileUpload className="text-lg" />
                 </span>
                 <span className="flex-1">Export Profile</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-700/80">
-                  Backup
-                </span>
               </button>
               <div>
                 <input
@@ -446,9 +437,6 @@ export default function Home() {
                     <MdFileDownload className="text-lg" />
                   </span>
                   <span className="flex-1">Import Profile</span>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700/80">
-                    Restore
-                  </span>
                 </button>
               </div>
               <button
@@ -459,9 +447,6 @@ export default function Home() {
                   <MdDeleteForever className="text-lg" />
                 </span>
                 <span className="flex-1">Clear All Data</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-red-700/80">
-                  Reset
-                </span>
               </button>
             </div>
           </div>
