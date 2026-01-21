@@ -961,6 +961,23 @@ function UserInfoForm({
           </div>
         ) : null}
       </Modal>
+      {isViewMode && pinnedQuickInfo.length ? (
+        <div className="fixed bottom-6 right-4 z-40 flex flex-col gap-3">
+          {pinnedQuickInfo.map((item, index) => (
+            <button
+              key={`floating-${item.key}`}
+              className="flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-xl transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-2xl"
+              onClick={() => setQuickInfoOpen(item)}
+              aria-label={`Open ${item.label}`}
+              style={{
+                background: `linear-gradient(135deg, hsl(${(index * 47) % 360} 80% 55%), hsl(${(index * 47) % 360} 80% 40%))`
+              }}
+            >
+              <item.Icon className="text-xl" />
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
