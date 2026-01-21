@@ -114,6 +114,15 @@ const formatPhoneNumber = (input: string) => {
   return trimmed;
 };
 
+const formatAadhaarNumber = (input: string) => {
+  const trimmed = input.trim();
+  if (!trimmed) return trimmed;
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return trimmed;
+  const groups = digits.match(/.{1,4}/g);
+  return groups ? groups.join(" ") : digits;
+};
+
 const fieldCategories: CategoryConfig[] = [
   {
     title: "Personal Information",
@@ -898,7 +907,9 @@ function UserInfoForm({
             <p className="break-words text-2xl font-semibold text-black/90">
               {quickInfoOpen.key === "phoneNumber"
                 ? formatPhoneNumber(quickInfoOpen.value)
-                : quickInfoOpen.value}
+                : quickInfoOpen.key === "aadhaar"
+                  ? formatAadhaarNumber(quickInfoOpen.value)
+                  : quickInfoOpen.value}
             </p>
           </div>
         ) : null}
@@ -1014,7 +1025,12 @@ function FieldRow({
 }: FieldRowProps) {
   const Icon = field.icon;
   const [isZoomOpen, setIsZoomOpen] = useState(false);
-  const displayValue = field.key === "phoneNumber" ? formatPhoneNumber(value) : value;
+  const displayValue =
+    field.key === "phoneNumber"
+      ? formatPhoneNumber(value)
+      : field.key === "aadhaar"
+        ? formatAadhaarNumber(value)
+        : value;
   const isName = isNameField(field.key);
   const modalValue = isName ? fullNameValue : displayValue;
   const canOpenModal = isName ? Boolean(fullNameValue) : Boolean(value);
@@ -1079,7 +1095,9 @@ function FieldRow({
             <p className="text-sm font-semibold uppercase tracking-wide text-black/40">
               {isName ? "Name" : field.label}
             </p>
-            <p className="break-words text-2xl font-semibold text-black/90">{modalValue}</p>
+            <p className="break-words text-2xl font-semibold text-black/90">
+              {field.key === "aadhaar" ? formatAadhaarNumber(modalValue) : modalValue}
+            </p>
           </div>
         </Modal>
       </>
