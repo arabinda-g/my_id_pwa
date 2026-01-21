@@ -203,9 +203,7 @@ const fieldCategories: CategoryConfig[] = [
     color: "#3b82f6",
     fields: [
       { icon: MdPerson, key: "firstName", label: "First Name", required: true },
-      { icon: MdPerson, key: "lastName", label: "Last Name", required: true },
-      { icon: MdPersonOutline, key: "fatherName", label: "Father name" },
-      { icon: MdPersonOutline, key: "motherName", label: "Mother name" }
+      { icon: MdPerson, key: "lastName", label: "Last Name", required: true }
     ]
   },
   {
@@ -247,6 +245,15 @@ const fieldCategories: CategoryConfig[] = [
       { icon: FaSkype, key: "skypeId", label: "Skype ID" },
       { icon: FaWhatsapp, key: "whatsappLink", label: "WhatsApp link to chat" },
       { icon: FaInstagram, key: "instagram", label: "Instagram" }
+    ]
+  },
+  {
+    title: "Family",
+    icon: MdPersonOutline,
+    color: "#14b8a6",
+    fields: [
+      { icon: MdPersonOutline, key: "fatherName", label: "Father name" },
+      { icon: MdPersonOutline, key: "motherName", label: "Mother name" }
     ]
   }
 ];
