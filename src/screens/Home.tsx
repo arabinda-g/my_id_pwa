@@ -121,6 +121,48 @@ const formatAadhaarNumber = (input: string) => {
   return groups ? groups.join(" ") : digits;
 };
 
+const splitUrlPrefix = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const withProtocol = trimmed.match(/^(https?:\/\/)(www\.)?/i);
+  if (withProtocol) {
+    const prefix = withProtocol[0];
+    return { prefix, rest: trimmed.slice(prefix.length) };
+  }
+  const withWww = trimmed.match(/^(www\.)/i);
+  if (withWww) {
+    const prefix = withWww[0];
+    return { prefix, rest: trimmed.slice(prefix.length) };
+  }
+  return null;
+};
+
+const renderUrlValue = (value: string, prefixClass: string, restClass: string) => {
+  const parts = splitUrlPrefix(value);
+  if (!parts) return value;
+  return (
+    <>
+      <span className={prefixClass}>{parts.prefix}</span>
+      <span className={restClass}>{parts.rest}</span>
+    </>
+  );
+};
+
+const isUrlValue = (value: string) => Boolean(splitUrlPrefix(value));
+
+const stripUrlPrefix = (value: string) => {
+  const parts = splitUrlPrefix(value);
+  return parts ? parts.rest : value;
+};
+
+const getUrlHref = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
+  return trimmed;
+};
+
 const buildVCard = (userData: Record<string, string>) => {
   const firstName = userData["firstName"] || "";
   const lastName = userData["lastName"] || "";
@@ -952,11 +994,27 @@ function UserInfoForm({
               {quickInfoOpen.label}
             </p>
             <p className="break-words text-2xl font-semibold text-black/90">
-              {quickInfoOpen.key === "phoneNumber"
-                ? formatPhoneNumber(quickInfoOpen.value)
-                : quickInfoOpen.key === "aadhaar"
-                  ? formatAadhaarNumber(quickInfoOpen.value)
-                  : quickInfoOpen.value}
+              {(() => {
+                const formattedValue =
+                  quickInfoOpen.key === "phoneNumber"
+                    ? formatPhoneNumber(quickInfoOpen.value)
+                    : quickInfoOpen.key === "aadhaar"
+                      ? formatAadhaarNumber(quickInfoOpen.value)
+                      : quickInfoOpen.value;
+                const displayValue = stripUrlPrefix(formattedValue);
+                return isUrlValue(formattedValue) ? (
+                  <a
+                    className="hover:shadow-none hover:translate-y-0"
+                    href={getUrlHref(formattedValue)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {displayValue}
+                  </a>
+                ) : (
+                  displayValue
+                );
+              })()}
             </p>
           </div>
         ) : null}
@@ -1098,6 +1156,10 @@ function FieldRow({
   const isName = isNameField(field.key);
   const modalValue = isName ? fullNameValue : displayValue;
   const canOpenModal = isName ? Boolean(fullNameValue) : Boolean(value);
+  const displayNode = isUrlValue(displayValue)
+    ? renderUrlValue(displayValue, "text-black/40", "text-black/80")
+    : displayValue;
+  const modalDisplayValue = stripUrlPrefix(modalValue);
 
   if (isViewMode) {
     return (
@@ -1125,7 +1187,7 @@ function FieldRow({
             <p className="text-xs font-semibold uppercase tracking-wide text-black/40">
               {field.label}
             </p>
-            <p className="text-base font-semibold text-black/80">{displayValue}</p>
+            <p className="text-base font-semibold text-black/80">{displayNode}</p>
           </div>
           <button
             className="rounded-lg bg-black/5 p-2 text-black/50"
@@ -1148,7 +1210,20 @@ function FieldRow({
               {isName ? "Name" : field.label}
             </p>
             <p className="break-words text-2xl font-semibold text-black/90">
-              {field.key === "aadhaar" ? formatAadhaarNumber(modalValue) : modalValue}
+              {field.key === "aadhaar" ? (
+                formatAadhaarNumber(modalValue)
+              ) : isUrlValue(modalValue) ? (
+                <a
+                  className="hover:shadow-none hover:translate-y-0"
+                  href={getUrlHref(modalValue)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {modalDisplayValue}
+                </a>
+              ) : (
+                modalDisplayValue
+              )}
             </p>
           </div>
         </Modal>
