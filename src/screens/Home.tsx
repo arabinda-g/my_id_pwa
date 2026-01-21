@@ -832,7 +832,7 @@ function UserInfoForm({
                 {pinnedQuickInfo.map((item) => (
                   <button
                     key={item.key}
-                    className="flex h-12 w-12 items-center justify-center rounded-2xl border border-black/5 bg-gradient-to-br from-white to-gray-50 text-purple-700 shadow-sm"
+                    className="flex h-12 w-12 items-center justify-center rounded-2xl border-2 border-purple-200/80 bg-gradient-to-br from-white to-gray-50 text-purple-700 shadow-sm"
                     onClick={() => setQuickInfoOpen(item)}
                     aria-label={`Open ${item.label}`}
                   >
