@@ -35,9 +35,11 @@ import {
   clearUserData,
   getPinnedFields,
   getProfileImage,
+  getUpiQrImage,
   getUserData,
   setProfileImage,
   setPinnedFields as setPinnedFieldsStorage,
+  setUpiQrImage as setUpiQrImageStorage,
   setUserData
 } from "../utils/storage";
 import { Modal } from "../components/Modal";
@@ -256,6 +258,7 @@ export default function Home() {
   const [isViewMode, setIsViewMode] = useState(false);
   const [userData, setLocalUserData] = useState<Record<string, string>>({});
   const [profileImage, setLocalProfileImage] = useState("");
+  const [upiQrImage, setLocalUpiQrImage] = useState("");
   const [pinnedFields, setPinnedFields] = useState<string[]>([]);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [isQrOpen, setIsQrOpen] = useState(false);
@@ -275,6 +278,7 @@ export default function Home() {
     setLocalUserData(data);
     setIsViewMode(Object.values(data).some((value) => value.trim().length > 0));
     setLocalProfileImage(getProfileImage());
+    setLocalUpiQrImage(getUpiQrImage());
     const storedPinned = getPinnedFields();
     const normalizedPinned = normalizePinnedFields(storedPinned);
     setPinnedFields(normalizedPinned);
@@ -305,6 +309,40 @@ export default function Home() {
       event.target.value = "";
     };
     reader.readAsDataURL(file);
+  };
+
+  const readClipboardImage = async () => {
+    if (!navigator.clipboard?.read) {
+      showMessage("Clipboard images not supported", "warn");
+      return "";
+    }
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imageType = item.types.find((type) => type.startsWith("image/"));
+        if (!imageType) continue;
+        const blob = await item.getType(imageType);
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result;
+            if (typeof result === "string") {
+              resolve(result);
+            } else {
+              reject(new Error("Invalid image data"));
+            }
+          };
+          reader.onerror = () => reject(new Error("Failed to read image"));
+          reader.readAsDataURL(blob);
+        });
+        return dataUrl;
+      }
+      showMessage("No image found in clipboard", "warn");
+      return "";
+    } catch {
+      showMessage("Unable to read clipboard image", "error");
+      return "";
+    }
   };
 
   const updateField = (key: string, value: string) => {
@@ -446,7 +484,8 @@ export default function Home() {
     const exportPayload = {
       userData: data,
       profileImage: getProfileImage(),
-      pinnedFields: getPinnedFields()
+      pinnedFields: getPinnedFields(),
+      upiQrImage: getUpiQrImage()
     };
     try {
       const encryptedPayload = await encryptPayload(exportPayload, trimmedPassword);
@@ -512,16 +551,20 @@ export default function Home() {
         userData?: Record<string, string>;
         profileImage?: string;
         pinnedFields?: string[];
+        upiQrImage?: string;
       };
       const hasUserData = Object.prototype.hasOwnProperty.call(decryptedObject, "userData");
       const data = hasUserData ? decryptedObject.userData ?? {} : (decrypted as Record<string, string>);
       const image = hasUserData ? decryptedObject.profileImage ?? "" : "";
       const pinned = hasUserData ? decryptedObject.pinnedFields ?? [] : [];
+      const upiImage = hasUserData ? decryptedObject.upiQrImage ?? "" : "";
       setUserData(data);
       setPinnedFieldsStorage(pinned);
       setLocalUserData(data);
       setProfileImage(image);
       setLocalProfileImage(image);
+      setUpiQrImageStorage(upiImage);
+      setLocalUpiQrImage(upiImage);
       setPinnedFields(pinned);
       setIsViewMode(Object.values(data).some((value) => value.trim().length > 0));
       showMessage("Profile imported", "ok");
@@ -543,6 +586,8 @@ export default function Home() {
     setLocalUserData({});
     setIsViewMode(false);
     setPinnedFields([]);
+    setUpiQrImageStorage("");
+    setLocalUpiQrImage("");
     showMessage("Profile cleared", "ok");
   };
 
@@ -704,6 +749,7 @@ export default function Home() {
           isViewMode={isViewMode}
           userData={userData}
           profileImage={profileImage}
+          upiQrImage={upiQrImage}
           pinnedFields={pinnedFields}
           onTogglePin={(key) => {
             setPinnedFields((prev) => {
@@ -741,6 +787,17 @@ export default function Home() {
           onClearImage={() => {
             setProfileImage("");
             setLocalProfileImage("");
+          }}
+          onPasteUpiImage={async () => {
+            const dataUrl = await readClipboardImage();
+            if (!dataUrl) return;
+            setUpiQrImageStorage(dataUrl);
+            setLocalUpiQrImage(dataUrl);
+            showMessage("UPI QR image pasted", "ok");
+          }}
+          onClearUpiImage={() => {
+            setUpiQrImageStorage("");
+            setLocalUpiQrImage("");
           }}
         />
 
@@ -900,6 +957,7 @@ type UserInfoFormProps = {
   isViewMode: boolean;
   userData: Record<string, string>;
   profileImage: string;
+  upiQrImage: string;
   pinnedFields: string[];
   onTogglePin: (key: string) => void;
   onReorderPinned: (fields: string[]) => void;
@@ -909,12 +967,15 @@ type UserInfoFormProps = {
   categoryCompletion: (category: CategoryConfig) => number;
   onPickImage: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onClearImage: () => void;
+  onPasteUpiImage: () => void;
+  onClearUpiImage: () => void;
 };
 
 function UserInfoForm({
   isViewMode,
   userData,
   profileImage,
+  upiQrImage,
   pinnedFields,
   onTogglePin,
   onReorderPinned,
@@ -923,7 +984,9 @@ function UserInfoForm({
   completionPercentage,
   categoryCompletion,
   onPickImage,
-  onClearImage
+  onClearImage,
+  onPasteUpiImage,
+  onClearUpiImage
 }: UserInfoFormProps) {
   const profileInputRef = useRef<HTMLInputElement | null>(null);
   const [isProfileImageOpen, setIsProfileImageOpen] = useState(false);
@@ -1035,11 +1098,18 @@ function UserInfoForm({
 
   const shouldShowCategory = (category: CategoryConfig) => {
     if (!isViewMode) return true;
-    return category.fields.some((field) => userData[field.key]?.trim().length);
+    return category.fields.some((field) =>
+      field.key === "upiAddress"
+        ? Boolean(userData[field.key]?.trim().length || upiQrImage)
+        : userData[field.key]?.trim().length
+    );
   };
 
   const shouldShowField = (key: string) => {
     if (!isViewMode) return true;
+    if (key === "upiAddress") {
+      return Boolean(userData[key]?.trim().length || upiQrImage);
+    }
     return Boolean(userData[key]?.trim().length);
   };
 
@@ -1227,6 +1297,9 @@ function UserInfoForm({
               categoryCompletion={categoryCompletion(category)}
               shouldShowField={shouldShowField}
               fullNameValue={fullNameValue}
+              upiQrImage={upiQrImage}
+              onPasteUpiImage={onPasteUpiImage}
+              onClearUpiImage={onClearUpiImage}
             />
           ) : null
         )}
@@ -1311,6 +1384,9 @@ type CategorySectionProps = {
   categoryCompletion: number;
   shouldShowField: (key: string) => boolean;
   fullNameValue: string;
+  upiQrImage: string;
+  onPasteUpiImage: () => void;
+  onClearUpiImage: () => void;
 };
 
 function CategorySection({
@@ -1322,7 +1398,10 @@ function CategorySection({
   onTogglePin,
   categoryCompletion,
   shouldShowField,
-  fullNameValue
+  fullNameValue,
+  upiQrImage,
+  onPasteUpiImage,
+  onClearUpiImage
 }: CategorySectionProps) {
   const Icon = category.icon;
   const isPinnedField = (key: string) =>
@@ -1379,6 +1458,9 @@ function CategorySection({
               isPinned={isPinnedField(field.key)}
               onTogglePin={() => onTogglePin(field.key)}
               fullNameValue={fullNameValue}
+              upiQrImage={upiQrImage}
+              onPasteUpiImage={onPasteUpiImage}
+              onClearUpiImage={onClearUpiImage}
             />
           ) : null
         )}
@@ -1395,6 +1477,9 @@ type FieldRowProps = {
   isPinned: boolean;
   onTogglePin: () => void;
   fullNameValue: string;
+  upiQrImage: string;
+  onPasteUpiImage: () => void;
+  onClearUpiImage: () => void;
 };
 
 function FieldRow({
@@ -1404,7 +1489,10 @@ function FieldRow({
   onChange,
   isPinned,
   onTogglePin,
-  fullNameValue
+  fullNameValue,
+  upiQrImage,
+  onPasteUpiImage,
+  onClearUpiImage
 }: FieldRowProps) {
   const Icon = field.icon;
   const [isZoomOpen, setIsZoomOpen] = useState(false);
@@ -1415,11 +1503,17 @@ function FieldRow({
         ? formatAadhaarNumber(value)
         : value;
   const isName = isNameField(field.key);
+  const isUpi = field.key === "upiAddress";
   const modalValue = isName ? fullNameValue : displayValue;
-  const canOpenModal = isName ? Boolean(fullNameValue) : Boolean(value);
-  const displayNode = isUrlValue(displayValue)
-    ? renderUrlValue(displayValue, "text-black/40", "text-black/80")
-    : displayValue;
+  const canOpenModal = isName
+    ? Boolean(fullNameValue)
+    : isUpi
+      ? Boolean(value || upiQrImage)
+      : Boolean(value);
+  const displayText = isUpi && !displayValue && upiQrImage ? "QR image added" : displayValue;
+  const displayNode = isUrlValue(displayText)
+    ? renderUrlValue(displayText, "text-black/40", "text-black/80")
+    : displayText;
   const modalDisplayValue = stripUrlPrefix(modalValue);
 
   if (isViewMode) {
@@ -1470,22 +1564,27 @@ function FieldRow({
             <p className="text-sm font-semibold uppercase tracking-wide text-black/40">
               {isName ? "Name" : field.label}
             </p>
-            <p className="break-words text-2xl font-semibold text-black/90">
-              {field.key === "aadhaar" ? (
-                formatAadhaarNumber(modalValue)
-              ) : isUrlValue(modalValue) ? (
-                <a
-                  className="hover:shadow-none hover:translate-y-0"
-                  href={getUrlHref(modalValue)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {modalDisplayValue}
-                </a>
-              ) : (
-                modalDisplayValue
-              )}
-            </p>
+            {modalDisplayValue ? (
+              <p className="break-words text-2xl font-semibold text-black/90">
+                {field.key === "aadhaar" ? (
+                  formatAadhaarNumber(modalValue)
+                ) : isUrlValue(modalValue) ? (
+                  <a
+                    className="hover:shadow-none hover:translate-y-0"
+                    href={getUrlHref(modalValue)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {modalDisplayValue}
+                  </a>
+                ) : (
+                  modalDisplayValue
+                )}
+              </p>
+            ) : null}
+            {isUpi && upiQrImage ? (
+              <img src={upiQrImage} alt="UPI QR" className="max-h-64 w-full rounded-2xl object-contain" />
+            ) : null}
           </div>
         </Modal>
       </>
@@ -1515,11 +1614,32 @@ function FieldRow({
         >
           {isPinned ? <MdPushPin /> : <MdOutlinePushPin />}
         </button>
+        {isUpi ? (
+          <button
+            className="rounded-md p-1 text-purple-700"
+            onClick={onPasteUpiImage}
+            aria-label="Paste UPI QR image"
+            type="button"
+          >
+            <MdQrCodeScanner />
+          </button>
+        ) : null}
+        {isUpi && upiQrImage ? (
+          <button
+            className="rounded-md p-1 text-black/40"
+            onClick={onClearUpiImage}
+            aria-label="Remove UPI QR image"
+            type="button"
+          >
+            <MdDeleteForever />
+          </button>
+        ) : null}
         {value ? (
           <button
             className="rounded-md p-1 text-purple-700"
             onClick={() => navigator.clipboard.writeText(value)}
             aria-label={`Copy ${field.label}`}
+            type="button"
           >
             <MdContentCopy />
           </button>
@@ -1529,6 +1649,7 @@ function FieldRow({
             className="rounded-md p-1 text-black/40"
             onClick={() => onChange("")}
             aria-label={`Clear ${field.label}`}
+            type="button"
           >
             <MdClear />
           </button>

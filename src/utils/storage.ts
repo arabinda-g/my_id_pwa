@@ -2,7 +2,8 @@ export const storageKeys = {
   hasSeenGetStarted: "has_seen_get_started",
   userData: "user_data",
   profileImage: "profile_image",
-  pinnedFields: "pinned_fields"
+  pinnedFields: "pinned_fields",
+  upiQrImage: "upi_qr_image"
 };
 
 export function getBoolean(key: string, fallback = false) {
@@ -81,6 +82,18 @@ export function setProfileImage(base64: string) {
     localStorage.setItem(storageKeys.profileImage, base64);
   } else {
     localStorage.removeItem(storageKeys.profileImage);
+  }
+}
+
+export function getUpiQrImage() {
+  return localStorage.getItem(storageKeys.upiQrImage) ?? "";
+}
+
+export function setUpiQrImage(base64: string) {
+  if (base64) {
+    localStorage.setItem(storageKeys.upiQrImage, base64);
+  } else {
+    localStorage.removeItem(storageKeys.upiQrImage);
   }
 }
 
