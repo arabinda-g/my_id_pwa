@@ -262,6 +262,10 @@ export default function Home() {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [exportPassword, setExportPassword] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importPassword, setImportPassword] = useState("");
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "ok" | "warn" | "error" } | null>(
     null
   );
@@ -364,6 +368,15 @@ export default function Home() {
     return btoa(binary);
   };
 
+  const fromBase64 = (value: string) => {
+    const binary = atob(value);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  };
+
   const encryptPayload = async (payload: unknown, password: string) => {
     const encoder = new TextEncoder();
     const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -391,6 +404,35 @@ export default function Home() {
       iv: toBase64(iv.buffer),
       ciphertext: toBase64(ciphertext)
     };
+  };
+
+  const decryptPayload = async (payload: {
+    salt: string;
+    iv: string;
+    ciphertext: string;
+    iterations?: number;
+  }, password: string) => {
+    const encoder = new TextEncoder();
+    const salt = new Uint8Array(fromBase64(payload.salt));
+    const iv = new Uint8Array(fromBase64(payload.iv));
+    const iterations = payload.iterations ?? 100000;
+    const keyMaterial = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, [
+      "deriveKey"
+    ]);
+    const key = await crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+      keyMaterial,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["decrypt"]
+    );
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      fromBase64(payload.ciphertext)
+    );
+    const decoder = new TextDecoder();
+    return JSON.parse(decoder.decode(plaintext)) as unknown;
   };
 
   const handleExport = async () => {
@@ -426,24 +468,55 @@ export default function Home() {
     }
   };
 
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setPendingImportFile(file);
+    setIsImportOpen(true);
+  };
+
+  const handleImportConfirm = async () => {
+    if (!pendingImportFile) return;
+    const trimmedPassword = importPassword.trim();
+    if (!trimmedPassword) {
+      showMessage("Please enter a password", "warn");
+      return;
+    }
+    setIsImporting(true);
     try {
-      const text = await file.text();
+      const text = await pendingImportFile.text();
       const parsed = JSON.parse(text) as unknown;
       if (!parsed || typeof parsed !== "object") {
         throw new Error("Invalid profile data");
       }
-      const parsedObject = parsed as {
+      const parsedObject = parsed as Record<string, unknown>;
+      const isEncrypted =
+        typeof parsedObject["ciphertext"] === "string" &&
+        typeof parsedObject["salt"] === "string" &&
+        typeof parsedObject["iv"] === "string";
+      const decrypted = isEncrypted
+        ? await decryptPayload(
+            parsedObject as {
+              salt: string;
+              iv: string;
+              ciphertext: string;
+              iterations?: number;
+            },
+            trimmedPassword
+          )
+        : parsed;
+      if (!decrypted || typeof decrypted !== "object") {
+        throw new Error("Invalid profile data");
+      }
+      const decryptedObject = decrypted as {
         userData?: Record<string, string>;
         profileImage?: string;
         pinnedFields?: string[];
       };
-      const hasUserData = Object.prototype.hasOwnProperty.call(parsedObject, "userData");
-      const data = hasUserData ? parsedObject.userData ?? {} : (parsed as Record<string, string>);
-      const image = hasUserData ? parsedObject.profileImage ?? "" : "";
-      const pinned = hasUserData ? parsedObject.pinnedFields ?? [] : [];
+      const hasUserData = Object.prototype.hasOwnProperty.call(decryptedObject, "userData");
+      const data = hasUserData ? decryptedObject.userData ?? {} : (decrypted as Record<string, string>);
+      const image = hasUserData ? decryptedObject.profileImage ?? "" : "";
+      const pinned = hasUserData ? decryptedObject.pinnedFields ?? [] : [];
       setUserData(data);
       setPinnedFieldsStorage(pinned);
       setLocalUserData(data);
@@ -455,6 +528,10 @@ export default function Home() {
     } catch {
       showMessage("Import failed", "error");
     } finally {
+      setIsImporting(false);
+      setIsImportOpen(false);
+      setImportPassword("");
+      setPendingImportFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -663,6 +740,57 @@ export default function Home() {
         </div>
       ) : null}
       <QrModal isOpen={isQrOpen} onClose={() => setIsQrOpen(false)} qrData={qrData} />
+      <Modal
+        isOpen={isImportOpen}
+        onClose={() => {
+          if (isImporting) return;
+          setIsImportOpen(false);
+          setImportPassword("");
+          setPendingImportFile(null);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        }}
+      >
+        <div className="flex flex-col gap-4 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
+            <MdFileDownload className="text-2xl" />
+          </div>
+          <div>
+            <p className="text-lg font-semibold text-black/90">Decrypt import</p>
+            <p className="mt-1 text-sm text-black/60">Enter the password used to encrypt this file.</p>
+          </div>
+          <input
+            type="password"
+            className="w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-black outline-none focus:ring-2 focus:ring-purple-700"
+            placeholder="Password"
+            value={importPassword}
+            onChange={(event) => setImportPassword(event.target.value)}
+            autoFocus
+          />
+          <div className="flex gap-3">
+            <button
+              type="button"
+              className="flex-1 rounded-xl border border-black/10 px-4 py-2 text-sm font-semibold text-black/70"
+              onClick={() => {
+                if (isImporting) return;
+                setIsImportOpen(false);
+                setImportPassword("");
+                setPendingImportFile(null);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="flex-1 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              onClick={handleImportConfirm}
+              disabled={isImporting}
+            >
+              {isImporting ? "Decrypting..." : "Import"}
+            </button>
+          </div>
+        </div>
+      </Modal>
       <Modal
         isOpen={isExportOpen}
         onClose={() => {

@@ -27,8 +27,19 @@ export function getUserData(): Record<string, string> {
   const raw = localStorage.getItem(storageKeys.userData);
   if (!raw) return {};
   try {
-    const parsed = JSON.parse(raw) as Record<string, string>;
-    return parsed ?? {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object") return {};
+    const cleaned: Record<string, string> = {};
+    Object.entries(parsed).forEach(([key, value]) => {
+      if (typeof value === "string") {
+        cleaned[key] = value;
+        return;
+      }
+      if (value !== null && value !== undefined) {
+        cleaned[key] = String(value);
+      }
+    });
+    return cleaned;
   } catch {
     return {};
   }
