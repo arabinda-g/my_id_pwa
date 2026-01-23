@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   MdAccountBalance,
   MdAccountBalanceWallet,
+  MdAdd,
   MdClear,
   MdContentCopy,
   MdCreditCard,
@@ -32,29 +33,57 @@ import {
 import { FaInstagram, FaLinkedinIn, FaSkype, FaWhatsapp } from "react-icons/fa";
 import {
   clearPinnedFields,
+  clearProfileConfig,
   clearUserData,
   getPinnedFields,
+  getProfileConfig,
   getProfileImage,
   getUpiQrImage,
   getUserData,
   setProfileImage,
   setPinnedFields as setPinnedFieldsStorage,
+  setProfileConfig,
   setUpiQrImage as setUpiQrImageStorage,
   setUserData
 } from "../utils/storage";
 import { Modal } from "../components/Modal";
 import { QrModal } from "../components/QrModal";
 
+const iconRegistry = {
+  person: MdPerson,
+  personOutline: MdPersonOutline,
+  email: MdEmail,
+  phone: MdPhone,
+  home: MdHome,
+  locationCity: MdLocationCity,
+  language: MdLanguage,
+  accountBalance: MdAccountBalance,
+  creditCard: MdCreditCard,
+  directionsCar: MdDirectionsCar,
+  payment: MdPayment,
+  wallet: MdAccountBalanceWallet,
+  share: MdShare,
+  facebook: MdFacebook,
+  linkedin: FaLinkedinIn,
+  skype: FaSkype,
+  whatsapp: FaWhatsapp,
+  instagram: FaInstagram,
+  info: MdInfoOutline
+};
+
+type IconKey = keyof typeof iconRegistry;
+
 type FieldConfig = {
-  icon: React.ComponentType<{ className?: string }>;
   key: string;
   label: string;
+  iconKey: IconKey;
   required?: boolean;
 };
 
 type CategoryConfig = {
+  id: string;
   title: string;
-  icon: React.ComponentType<{ className?: string }>;
+  iconKey: IconKey;
   color: string;
   fields: FieldConfig[];
 };
@@ -79,6 +108,85 @@ const normalizePinnedFields = (fields: string[]) => {
     }
   });
   return normalized;
+};
+
+const iconOptions: { key: IconKey; label: string }[] = [
+  { key: "person", label: "Person" },
+  { key: "personOutline", label: "Person Outline" },
+  { key: "email", label: "Email" },
+  { key: "phone", label: "Phone" },
+  { key: "home", label: "Home" },
+  { key: "locationCity", label: "City" },
+  { key: "language", label: "Website" },
+  { key: "accountBalance", label: "Bank" },
+  { key: "creditCard", label: "Card" },
+  { key: "directionsCar", label: "License" },
+  { key: "payment", label: "Payment" },
+  { key: "wallet", label: "Wallet" },
+  { key: "share", label: "Share" },
+  { key: "facebook", label: "Facebook" },
+  { key: "linkedin", label: "LinkedIn" },
+  { key: "skype", label: "Skype" },
+  { key: "whatsapp", label: "WhatsApp" },
+  { key: "instagram", label: "Instagram" },
+  { key: "info", label: "Info" }
+];
+
+const colorOptions = ["#3b82f6", "#22c55e", "#f97316", "#a855f7", "#4f46e5", "#14b8a6", "#ef4444"];
+
+const createId = () =>
+  `section_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+
+const resolveIcon = (iconKey?: IconKey) => iconRegistry[iconKey ?? "info"] ?? MdInfoOutline;
+
+const buildFieldKey = (label: string, categories: CategoryConfig[]) => {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const base = slug || "custom_field";
+  const existing = new Set(categories.flatMap((category) => category.fields.map((field) => field.key)));
+  if (!existing.has(base)) return base;
+  let index = 2;
+  while (existing.has(`${base}_${index}`)) index += 1;
+  return `${base}_${index}`;
+};
+
+const parseStoredCategories = (raw: unknown): CategoryConfig[] | null => {
+  if (!Array.isArray(raw)) return null;
+  const parsed = raw
+    .map((category) => {
+      if (!category || typeof category !== "object") return null;
+      const entry = category as Record<string, unknown>;
+      const title = typeof entry.title === "string" ? entry.title : null;
+      const color = typeof entry.color === "string" ? entry.color : null;
+      const iconKeyValue = typeof entry.iconKey === "string" ? entry.iconKey : null;
+      const iconKey = iconKeyValue && iconKeyValue in iconRegistry ? (iconKeyValue as IconKey) : null;
+      const fieldsRaw = Array.isArray(entry.fields) ? entry.fields : null;
+      if (!title || !color || !iconKey || !fieldsRaw) return null;
+      const fields = fieldsRaw
+        .map((field) => {
+          if (!field || typeof field !== "object") return null;
+          const fieldEntry = field as Record<string, unknown>;
+          const key = typeof fieldEntry.key === "string" ? fieldEntry.key : null;
+          const label = typeof fieldEntry.label === "string" ? fieldEntry.label : null;
+          const fieldIconKeyValue =
+            typeof fieldEntry.iconKey === "string" ? fieldEntry.iconKey : null;
+          const fieldIconKey =
+            fieldIconKeyValue && fieldIconKeyValue in iconRegistry
+              ? (fieldIconKeyValue as IconKey)
+              : null;
+          const required =
+            typeof fieldEntry.required === "boolean" ? fieldEntry.required : undefined;
+          if (!key || !label || !fieldIconKey) return null;
+          return { key, label, iconKey: fieldIconKey, required };
+        })
+        .filter((field): field is FieldConfig => Boolean(field));
+      const id = typeof entry.id === "string" ? entry.id : createId();
+      return { id, title, iconKey, color, fields };
+    })
+    .filter((category): category is CategoryConfig => Boolean(category));
+  return parsed.length ? parsed : null;
 };
 
 const formatPhoneNumber = (input: string) => {
@@ -196,64 +304,70 @@ const buildVCard = (userData: Record<string, string>) => {
   return lines;
 };
 
-const fieldCategories: CategoryConfig[] = [
+const defaultCategories: CategoryConfig[] = [
   {
+    id: "personal",
     title: "Personal Information",
-    icon: MdPerson,
+    iconKey: "person",
     color: "#3b82f6",
     fields: [
-      { icon: MdPerson, key: "firstName", label: "First Name", required: true },
-      { icon: MdPerson, key: "lastName", label: "Last Name", required: true }
+      { iconKey: "person", key: "firstName", label: "First Name", required: true },
+      { iconKey: "person", key: "lastName", label: "Last Name", required: true }
     ]
   },
   {
+    id: "contact",
     title: "Contact Details",
-    icon: MdPhone,
+    iconKey: "phone",
     color: "#22c55e",
     fields: [
-      { icon: MdEmail, key: "email", label: "Email", required: true },
-      { icon: MdPhone, key: "phoneNumber", label: "Phone Number", required: true },
-      { icon: MdHome, key: "address", label: "Address" },
-      { icon: MdLocationCity, key: "permanentAddress", label: "Permanent Address" },
-      { icon: MdLanguage, key: "website", label: "Website" }
+      { iconKey: "email", key: "email", label: "Email", required: true },
+      { iconKey: "phone", key: "phoneNumber", label: "Phone Number", required: true },
+      { iconKey: "home", key: "address", label: "Address" },
+      { iconKey: "locationCity", key: "permanentAddress", label: "Permanent Address" },
+      { iconKey: "language", key: "website", label: "Website" }
     ]
   },
   {
+    id: "documents",
     title: "Official Documents",
-    icon: MdAccountBalance,
+    iconKey: "accountBalance",
     color: "#f97316",
     fields: [
-      { icon: MdAccountBalance, key: "passportNumber", label: "Passport Number" },
-      { icon: MdCreditCard, key: "aadhaar", label: "Aadhaar" },
-      { icon: MdDirectionsCar, key: "dlNumber", label: "DL Number" },
-      { icon: MdAccountBalance, key: "panCardNumber", label: "PAN Card Number" }
+      { iconKey: "accountBalance", key: "passportNumber", label: "Passport Number" },
+      { iconKey: "creditCard", key: "aadhaar", label: "Aadhaar" },
+      { iconKey: "directionsCar", key: "dlNumber", label: "DL Number" },
+      { iconKey: "accountBalance", key: "panCardNumber", label: "PAN Card Number" }
     ]
   },
   {
+    id: "payments",
     title: "Digital Payments",
-    icon: MdPayment,
+    iconKey: "payment",
     color: "#a855f7",
-    fields: [{ icon: MdAccountBalanceWallet, key: "upiAddress", label: "UPI Address (Paytm)" }]
+    fields: [{ iconKey: "wallet", key: "upiAddress", label: "UPI Address (Paytm)" }]
   },
   {
+    id: "social",
     title: "Social Media",
-    icon: MdShare,
+    iconKey: "share",
     color: "#4f46e5",
     fields: [
-      { icon: FaLinkedinIn, key: "linkedInUrl", label: "LinkedIn URL" },
-      { icon: MdFacebook, key: "facebook", label: "Facebook" },
-      { icon: FaSkype, key: "skypeId", label: "Skype ID" },
-      { icon: FaWhatsapp, key: "whatsappLink", label: "WhatsApp link to chat" },
-      { icon: FaInstagram, key: "instagram", label: "Instagram" }
+      { iconKey: "linkedin", key: "linkedInUrl", label: "LinkedIn URL" },
+      { iconKey: "facebook", key: "facebook", label: "Facebook" },
+      { iconKey: "skype", key: "skypeId", label: "Skype ID" },
+      { iconKey: "whatsapp", key: "whatsappLink", label: "WhatsApp link to chat" },
+      { iconKey: "instagram", key: "instagram", label: "Instagram" }
     ]
   },
   {
+    id: "family",
     title: "Family",
-    icon: MdPersonOutline,
+    iconKey: "personOutline",
     color: "#14b8a6",
     fields: [
-      { icon: MdPersonOutline, key: "fatherName", label: "Father name" },
-      { icon: MdPersonOutline, key: "motherName", label: "Mother name" }
+      { iconKey: "personOutline", key: "fatherName", label: "Father name" },
+      { iconKey: "personOutline", key: "motherName", label: "Mother name" }
     ]
   }
 ];
@@ -263,6 +377,10 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
+  const [categories, setCategories] = useState<CategoryConfig[]>(() => {
+    const stored = parseStoredCategories(getProfileConfig());
+    return stored ?? defaultCategories;
+  });
   const [userData, setLocalUserData] = useState<Record<string, string>>({});
   const [profileImage, setLocalProfileImage] = useState("");
   const [upiQrImage, setLocalUpiQrImage] = useState("");
@@ -293,6 +411,10 @@ export default function Home() {
       setPinnedFieldsStorage(normalizedPinned);
     }
   }, []);
+
+  useEffect(() => {
+    setProfileConfig(categories);
+  }, [categories]);
 
   const userName = useMemo(() => userData["firstName"] || "User", [userData]);
 
@@ -358,7 +480,7 @@ export default function Home() {
 
   const saveUserInfo = () => {
     const missingFields: string[] = [];
-    fieldCategories.forEach((category) => {
+    categories.forEach((category) => {
       category.fields.forEach((field) => {
         if (field.required && !userData[field.key]?.trim()) {
           missingFields.push(field.label);
@@ -388,8 +510,8 @@ export default function Home() {
   };
 
   const completionPercentage = () => {
-    const totalFields = fieldCategories.reduce((sum, category) => sum + category.fields.length, 0);
-    const filledFields = fieldCategories.reduce((sum, category) => {
+    const totalFields = categories.reduce((sum, category) => sum + category.fields.length, 0);
+    const filledFields = categories.reduce((sum, category) => {
       return (
         sum +
         category.fields.filter((field) => userData[field.key]?.trim().length).length
@@ -489,10 +611,14 @@ export default function Home() {
     setIsExporting(true);
     const data = getUserData();
     const exportPayload = {
-      userData: data,
-      profileImage: getProfileImage(),
-      pinnedFields: getPinnedFields(),
-      upiQrImage: getUpiQrImage()
+      version: 1,
+      profile: {
+        userData: data,
+        profileImage: getProfileImage(),
+        pinnedFields: getPinnedFields(),
+        upiQrImage: getUpiQrImage(),
+        categories
+      }
     };
     try {
       const encryptedPayload = await encryptPayload(exportPayload, trimmedPassword);
@@ -550,29 +676,44 @@ export default function Home() {
             },
             trimmedPassword
           )
-        : parsed;
+        : parsedObject;
       if (!decrypted || typeof decrypted !== "object") {
         throw new Error("Invalid profile data");
       }
-      const decryptedObject = decrypted as {
-        userData?: Record<string, string>;
-        profileImage?: string;
-        pinnedFields?: string[];
-        upiQrImage?: string;
-      };
-      const hasUserData = Object.prototype.hasOwnProperty.call(decryptedObject, "userData");
-      const data = hasUserData ? decryptedObject.userData ?? {} : (decrypted as Record<string, string>);
-      const image = hasUserData ? decryptedObject.profileImage ?? "" : "";
-      const pinned = hasUserData ? decryptedObject.pinnedFields ?? [] : [];
-      const upiImage = hasUserData ? decryptedObject.upiQrImage ?? "" : "";
+      const decryptedObject = decrypted as Record<string, unknown>;
+      const profile = decryptedObject.profile;
+      if (!profile || typeof profile !== "object") {
+        throw new Error("Invalid profile data");
+      }
+      const profileObject = profile as Record<string, unknown>;
+      const dataRaw = profileObject.userData;
+      const data: Record<string, string> = {};
+      if (dataRaw && typeof dataRaw === "object") {
+        Object.entries(dataRaw as Record<string, unknown>).forEach(([key, value]) => {
+          if (typeof value === "string") {
+            data[key] = value;
+          }
+        });
+      }
+      const image = typeof profileObject.profileImage === "string" ? profileObject.profileImage : "";
+      const pinned = Array.isArray(profileObject.pinnedFields)
+        ? profileObject.pinnedFields.filter((item): item is string => typeof item === "string")
+        : [];
+      const upiImage = typeof profileObject.upiQrImage === "string" ? profileObject.upiQrImage : "";
+      const importedCategories = parseStoredCategories(profileObject.categories);
+      if (!importedCategories) {
+        throw new Error("Invalid profile config");
+      }
+      const normalizedPinned = normalizePinnedFields(pinned);
       setUserData(data);
-      setPinnedFieldsStorage(pinned);
+      setPinnedFieldsStorage(normalizedPinned);
       setLocalUserData(data);
       setProfileImage(image);
       setLocalProfileImage(image);
       setUpiQrImageStorage(upiImage);
       setLocalUpiQrImage(upiImage);
-      setPinnedFields(pinned);
+      setPinnedFields(normalizedPinned);
+      setCategories(importedCategories);
       setIsViewMode(Object.values(data).some((value) => value.trim().length > 0));
       showMessage("Profile imported", "ok");
     } catch {
@@ -589,12 +730,14 @@ export default function Home() {
   const handleClear = () => {
     clearUserData();
     clearPinnedFields();
+    clearProfileConfig();
     setProfileImage("");
     setLocalUserData({});
     setIsViewMode(false);
     setPinnedFields([]);
     setUpiQrImageStorage("");
     setLocalUpiQrImage("");
+    setCategories(defaultCategories);
     showMessage("Profile cleared", "ok");
   };
 
@@ -748,6 +891,7 @@ export default function Home() {
         </button>
         <UserInfoForm
           isViewMode={isViewMode}
+          categories={categories}
           userData={userData}
           profileImage={profileImage}
           upiQrImage={upiQrImage}
@@ -774,6 +918,7 @@ export default function Home() {
             setPinnedFieldsStorage(normalized);
             setPinnedFields(normalized);
           }}
+          onChangeCategories={setCategories}
           onUpdateField={updateField}
           onSave={saveUserInfo}
           onSwitchToEdit={() => setIsViewMode(false)}
@@ -958,12 +1103,14 @@ export default function Home() {
 
 type UserInfoFormProps = {
   isViewMode: boolean;
+  categories: CategoryConfig[];
   userData: Record<string, string>;
   profileImage: string;
   upiQrImage: string;
   pinnedFields: string[];
   onTogglePin: (key: string) => void;
   onReorderPinned: (fields: string[]) => void;
+  onChangeCategories: React.Dispatch<React.SetStateAction<CategoryConfig[]>>;
   onUpdateField: (key: string, value: string) => void;
   onSave: () => void;
   onSwitchToEdit: () => void;
@@ -978,12 +1125,14 @@ type UserInfoFormProps = {
 
 function UserInfoForm({
   isViewMode,
+  categories,
   userData,
   profileImage,
   upiQrImage,
   pinnedFields,
   onTogglePin,
   onReorderPinned,
+  onChangeCategories,
   onUpdateField,
   onSave,
   onSwitchToEdit,
@@ -1004,6 +1153,20 @@ function UserInfoForm({
     Icon: React.ComponentType<{ className?: string }>;
   } | null>(null);
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
+  const [draggingSectionId, setDraggingSectionId] = useState<string | null>(null);
+  const [draggingField, setDraggingField] = useState<{
+    fieldKey: string;
+    fromCategoryId: string;
+  } | null>(null);
+  const [isAddSectionOpen, setIsAddSectionOpen] = useState(false);
+  const [newSectionTitle, setNewSectionTitle] = useState("");
+  const [newSectionIconKey, setNewSectionIconKey] = useState<IconKey>("person");
+  const [newSectionColor, setNewSectionColor] = useState(colorOptions[0]);
+  const [isAddFieldOpen, setIsAddFieldOpen] = useState(false);
+  const [activeFieldCategoryId, setActiveFieldCategoryId] = useState<string | null>(null);
+  const [newFieldLabel, setNewFieldLabel] = useState("");
+  const [newFieldIconKey, setNewFieldIconKey] = useState<IconKey>("info");
+  const [newFieldRequired, setNewFieldRequired] = useState(false);
 
   const fullNameValue = useMemo(() => {
     const first = userData["firstName"]?.trim() ?? "";
@@ -1012,11 +1175,11 @@ function UserInfoForm({
   }, [userData]);
 
   const fieldConfigMap = useMemo(() => {
-    const entries = fieldCategories.flatMap((category) =>
+    const entries = categories.flatMap((category) =>
       category.fields.map((field) => [field.key, field] as const)
     );
     return new Map(entries);
-  }, []);
+  }, [categories]);
 
   const pinnedQuickInfo = useMemo<
     {
@@ -1047,11 +1210,12 @@ function UserInfoForm({
       const value = userData[key]?.trim() ?? "";
       if (!value) return;
       const field = fieldConfigMap.get(key);
+      const Icon = resolveIcon(field?.iconKey);
       items.push({
         key,
         label: field?.label ?? key,
         value,
-        Icon: field?.icon ?? MdInfoOutline
+        Icon
       });
     });
 
@@ -1064,7 +1228,7 @@ function UserInfoForm({
         return { key, label: "Name", Icon: MdPerson };
       }
       const field = fieldConfigMap.get(key);
-      return { key, label: field?.label ?? key, Icon: field?.icon ?? MdInfoOutline };
+      return { key, label: field?.label ?? key, Icon: resolveIcon(field?.iconKey) };
     });
   }, [fieldConfigMap, pinnedFields]);
 
@@ -1077,6 +1241,102 @@ function UserInfoForm({
     updated.splice(fromIndex, 1);
     updated.splice(toIndex, 0, fromKey);
     onReorderPinned(updated);
+  };
+
+  const reorderSections = (fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    onChangeCategories((prev) => {
+      const fromIndex = prev.findIndex((category) => category.id === fromId);
+      const toIndex = prev.findIndex((category) => category.id === toId);
+      if (fromIndex < 0 || toIndex < 0) return prev;
+      const updated = [...prev];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+      return updated;
+    });
+  };
+
+  const moveField = (
+    fromCategoryId: string,
+    toCategoryId: string,
+    fieldKey: string,
+    targetFieldKey?: string
+  ) => {
+    onChangeCategories((prev) => {
+      const next = prev.map((category) => ({
+        ...category,
+        fields: [...category.fields]
+      }));
+      const source = next.find((category) => category.id === fromCategoryId);
+      const target = next.find((category) => category.id === toCategoryId);
+      if (!source || !target) return prev;
+      const sourceIndex = source.fields.findIndex((field) => field.key === fieldKey);
+      if (sourceIndex < 0) return prev;
+      const [movedField] = source.fields.splice(sourceIndex, 1);
+      const targetIndex = targetFieldKey
+        ? target.fields.findIndex((field) => field.key === targetFieldKey)
+        : -1;
+      const insertIndex = targetIndex >= 0 ? targetIndex : target.fields.length;
+      target.fields.splice(insertIndex, 0, movedField);
+      return next;
+    });
+  };
+
+  const updateCategoryTitle = (categoryId: string, title: string) => {
+    onChangeCategories((prev) =>
+      prev.map((category) => (category.id === categoryId ? { ...category, title } : category))
+    );
+  };
+
+  const updateCategoryIcon = (categoryId: string, iconKey: IconKey) => {
+    onChangeCategories((prev) =>
+      prev.map((category) => (category.id === categoryId ? { ...category, iconKey } : category))
+    );
+  };
+
+  const handleAddSection = () => {
+    const trimmed = newSectionTitle.trim();
+    if (!trimmed) return;
+    const nextCategory: CategoryConfig = {
+      id: createId(),
+      title: trimmed,
+      iconKey: newSectionIconKey,
+      color: newSectionColor,
+      fields: []
+    };
+    onChangeCategories((prev) => [...prev, nextCategory]);
+    setIsAddSectionOpen(false);
+    setNewSectionTitle("");
+    setNewSectionIconKey("person");
+    setNewSectionColor(colorOptions[0]);
+  };
+
+  const handleAddField = () => {
+    const trimmed = newFieldLabel.trim();
+    if (!trimmed || !activeFieldCategoryId) return;
+    onChangeCategories((prev) =>
+      prev.map((category) => {
+        if (category.id !== activeFieldCategoryId) return category;
+        const key = buildFieldKey(trimmed, prev);
+        return {
+          ...category,
+          fields: [
+            ...category.fields,
+            {
+              key,
+              label: trimmed,
+              iconKey: newFieldIconKey,
+              required: newFieldRequired || undefined
+            }
+          ]
+        };
+      })
+    );
+    setIsAddFieldOpen(false);
+    setActiveFieldCategoryId(null);
+    setNewFieldLabel("");
+    setNewFieldIconKey("info");
+    setNewFieldRequired(false);
   };
 
   const buildQuickAction = (
@@ -1290,11 +1550,23 @@ function UserInfoForm({
         )}
       </div>
 
-      <div className="mt-6 space-y-6">
-        {fieldCategories.map((category) =>
+      <div className="mt-6 space-y-4">
+        {!isViewMode ? (
+          <button
+            type="button"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-black/20 bg-white px-4 py-3 text-sm font-semibold text-black/70"
+            onClick={() => setIsAddSectionOpen(true)}
+          >
+            <MdAdd className="text-lg" />
+            Add section
+          </button>
+        ) : null}
+      </div>
+      <div className="mt-4 space-y-6">
+        {categories.map((category) =>
           shouldShowCategory(category) ? (
             <CategorySection
-              key={category.title}
+              key={category.id}
               category={category}
               isViewMode={isViewMode}
               userData={userData}
@@ -1307,6 +1579,32 @@ function UserInfoForm({
               upiQrImage={upiQrImage}
               onPasteUpiImage={onPasteUpiImage}
               onClearUpiImage={onClearUpiImage}
+              onUpdateCategoryTitle={updateCategoryTitle}
+              onUpdateCategoryIcon={updateCategoryIcon}
+              onDragSectionStart={(categoryId) => setDraggingSectionId(categoryId)}
+              onDropSection={(categoryId) => {
+                if (draggingSectionId) reorderSections(draggingSectionId, categoryId);
+                setDraggingSectionId(null);
+              }}
+              onSectionDragEnd={() => setDraggingSectionId(null)}
+              onFieldDragStart={(categoryId, fieldKey) =>
+                setDraggingField({ fromCategoryId: categoryId, fieldKey })
+              }
+              onFieldDropOnField={(categoryId, targetFieldKey) => {
+                if (!draggingField) return;
+                moveField(draggingField.fromCategoryId, categoryId, draggingField.fieldKey, targetFieldKey);
+                setDraggingField(null);
+              }}
+              onFieldDropOnCategory={(categoryId) => {
+                if (!draggingField) return;
+                moveField(draggingField.fromCategoryId, categoryId, draggingField.fieldKey);
+                setDraggingField(null);
+              }}
+              onFieldDragEnd={() => setDraggingField(null)}
+              onAddField={(categoryId) => {
+                setActiveFieldCategoryId(categoryId);
+                setIsAddFieldOpen(true);
+              }}
             />
           ) : null
         )}
@@ -1374,6 +1672,160 @@ function UserInfoForm({
           />
         ) : null}
       </Modal>
+      <Modal
+        isOpen={isAddSectionOpen}
+        onClose={() => {
+          setIsAddSectionOpen(false);
+          setNewSectionTitle("");
+          setNewSectionIconKey("person");
+          setNewSectionColor(colorOptions[0]);
+        }}
+      >
+        <div className="flex flex-col gap-4 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-100 text-purple-700">
+            <MdAdd className="text-2xl" />
+          </div>
+          <div>
+            <p className="text-lg font-semibold text-black/90">Add section</p>
+            <p className="mt-1 text-sm text-black/60">Create a new section and choose its icon.</p>
+          </div>
+          <input
+            type="text"
+            className="w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-black outline-none focus:ring-2 focus:ring-purple-700"
+            placeholder="Section title"
+            value={newSectionTitle}
+            onChange={(event) => setNewSectionTitle(event.target.value)}
+            autoFocus
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-left text-xs font-semibold text-black/60">
+              Icon
+              <select
+                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-black outline-none"
+                value={newSectionIconKey}
+                onChange={(event) => setNewSectionIconKey(event.target.value as IconKey)}
+              >
+                {iconOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-left text-xs font-semibold text-black/60">
+              Color
+              <select
+                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-black outline-none"
+                value={newSectionColor}
+                onChange={(event) => setNewSectionColor(event.target.value)}
+              >
+                {colorOptions.map((color) => (
+                  <option key={color} value={color}>
+                    {color}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              className="flex-1 rounded-xl border border-black/10 px-4 py-2 text-sm font-semibold text-black/70"
+              onClick={() => {
+                setIsAddSectionOpen(false);
+                setNewSectionTitle("");
+                setNewSectionIconKey("person");
+                setNewSectionColor(colorOptions[0]);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="flex-1 rounded-xl bg-purple-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              onClick={handleAddSection}
+              disabled={!newSectionTitle.trim()}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      </Modal>
+      <Modal
+        isOpen={isAddFieldOpen}
+        onClose={() => {
+          setIsAddFieldOpen(false);
+          setActiveFieldCategoryId(null);
+          setNewFieldLabel("");
+          setNewFieldIconKey("info");
+          setNewFieldRequired(false);
+        }}
+      >
+        <div className="flex flex-col gap-4 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
+            <MdAdd className="text-2xl" />
+          </div>
+          <div>
+            <p className="text-lg font-semibold text-black/90">Add field</p>
+            <p className="mt-1 text-sm text-black/60">Create a custom field inside this section.</p>
+          </div>
+          <input
+            type="text"
+            className="w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-black outline-none focus:ring-2 focus:ring-purple-700"
+            placeholder="Field label"
+            value={newFieldLabel}
+            onChange={(event) => setNewFieldLabel(event.target.value)}
+            autoFocus
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-left text-xs font-semibold text-black/60">
+              Icon
+              <select
+                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-black outline-none"
+                value={newFieldIconKey}
+                onChange={(event) => setNewFieldIconKey(event.target.value as IconKey)}
+              >
+                {iconOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-xs font-semibold text-black/60">
+              <input
+                type="checkbox"
+                checked={newFieldRequired}
+                onChange={(event) => setNewFieldRequired(event.target.checked)}
+              />
+              Required
+            </label>
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              className="flex-1 rounded-xl border border-black/10 px-4 py-2 text-sm font-semibold text-black/70"
+              onClick={() => {
+                setIsAddFieldOpen(false);
+                setActiveFieldCategoryId(null);
+                setNewFieldLabel("");
+                setNewFieldIconKey("info");
+                setNewFieldRequired(false);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="flex-1 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              onClick={handleAddField}
+              disabled={!newFieldLabel.trim()}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      </Modal>
       {isViewMode && pinnedQuickInfo.length ? (
         <div className="fixed bottom-6 right-4 z-40 flex flex-col gap-3">
           {pinnedQuickInfo.map((item, index) => (
@@ -1408,6 +1860,16 @@ type CategorySectionProps = {
   upiQrImage: string;
   onPasteUpiImage: () => void;
   onClearUpiImage: () => void;
+  onUpdateCategoryTitle: (categoryId: string, title: string) => void;
+  onUpdateCategoryIcon: (categoryId: string, iconKey: IconKey) => void;
+  onDragSectionStart: (categoryId: string) => void;
+  onDropSection: (categoryId: string) => void;
+  onSectionDragEnd: () => void;
+  onFieldDragStart: (categoryId: string, fieldKey: string) => void;
+  onFieldDropOnField: (categoryId: string, targetFieldKey: string) => void;
+  onFieldDropOnCategory: (categoryId: string) => void;
+  onFieldDragEnd: () => void;
+  onAddField: (categoryId: string) => void;
 };
 
 function CategorySection({
@@ -1422,25 +1884,66 @@ function CategorySection({
   fullNameValue,
   upiQrImage,
   onPasteUpiImage,
-  onClearUpiImage
+  onClearUpiImage,
+  onUpdateCategoryTitle,
+  onUpdateCategoryIcon,
+  onDragSectionStart,
+  onDropSection,
+  onSectionDragEnd,
+  onFieldDragStart,
+  onFieldDropOnField,
+  onFieldDropOnCategory,
+  onFieldDragEnd,
+  onAddField
 }: CategorySectionProps) {
-  const Icon = category.icon;
+  const Icon = resolveIcon(category.iconKey);
   const isPinnedField = (key: string) =>
     isNameField(key) ? pinnedFields.includes(NAME_PIN_KEY) : pinnedFields.includes(key);
   return (
     <div
       className="overflow-hidden rounded-3xl border bg-white shadow-lg"
       style={{ borderColor: `${category.color}33` }}
+      onDragOver={(event) => {
+        if (isViewMode) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      }}
+      onDrop={(event) => {
+        if (isViewMode) return;
+        event.preventDefault();
+        const types = event.dataTransfer.types;
+        if (types.includes("text/section")) {
+          onDropSection(category.id);
+        } else if (types.includes("text/field")) {
+          onFieldDropOnCategory(category.id);
+        }
+      }}
     >
       <div
-        className="flex items-center justify-between px-5 py-4"
+        className="flex items-center justify-between gap-4 px-5 py-4"
         style={{
           background: isViewMode
             ? `linear-gradient(135deg, ${category.color}26, ${category.color}0D)`
             : `${category.color}1A`
         }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex flex-1 items-center gap-3">
+          {!isViewMode ? (
+            <button
+              type="button"
+              draggable
+              className="rounded-lg bg-black/10 p-2 text-black/50"
+              onDragStart={(event) => {
+                onDragSectionStart(category.id);
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/section", category.id);
+              }}
+              onDragEnd={onSectionDragEnd}
+              aria-label={`Reorder ${category.title}`}
+            >
+              <MdMenu />
+            </button>
+          ) : null}
           <div
             className="rounded-xl p-2 text-white shadow-md"
             style={{
@@ -1451,40 +1954,108 @@ function CategorySection({
           >
             <Icon className={isViewMode ? "text-xl" : "text-lg"} />
           </div>
-          <p
-            className={`font-bold ${isViewMode ? "text-lg" : "text-base"}`}
-            style={{ color: isViewMode ? "rgba(0,0,0,0.85)" : category.color }}
-          >
-            {category.title}
-          </p>
+          {isViewMode ? (
+            <p
+              className={`font-bold ${isViewMode ? "text-lg" : "text-base"}`}
+              style={{ color: isViewMode ? "rgba(0,0,0,0.85)" : category.color }}
+            >
+              {category.title}
+            </p>
+          ) : (
+            <input
+              className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/80 outline-none focus:ring-2 focus:ring-purple-600"
+              value={category.title}
+              onChange={(event) => onUpdateCategoryTitle(category.id, event.target.value)}
+              aria-label="Section title"
+            />
+          )}
         </div>
         {!isViewMode ? (
-          <span
-            className="rounded-full px-3 py-1 text-xs font-semibold"
-            style={{ backgroundColor: `${category.color}33`, color: category.color }}
-          >
-            {categoryCompletion}/{category.fields.length}
-          </span>
+          <div className="flex items-center gap-2">
+            <select
+              className="rounded-lg border border-black/10 bg-white px-2 py-2 text-xs font-semibold text-black/60 outline-none"
+              value={category.iconKey}
+              onChange={(event) => onUpdateCategoryIcon(category.id, event.target.value as IconKey)}
+              aria-label="Section icon"
+            >
+              {iconOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <span
+              className="rounded-full px-3 py-1 text-xs font-semibold"
+              style={{ backgroundColor: `${category.color}33`, color: category.color }}
+            >
+              {categoryCompletion}/{category.fields.length}
+            </span>
+          </div>
         ) : null}
       </div>
       <div className="space-y-3 px-5 py-5">
         {category.fields.map((field) =>
           shouldShowField(field.key) ? (
-            <FieldRow
+            <div
               key={field.key}
-              field={field}
-              isViewMode={isViewMode}
-              value={userData[field.key] ?? ""}
-              onChange={(value) => onUpdateField(field.key, value)}
-              isPinned={isPinnedField(field.key)}
-              onTogglePin={() => onTogglePin(field.key)}
-              fullNameValue={fullNameValue}
-              upiQrImage={upiQrImage}
-              onPasteUpiImage={onPasteUpiImage}
-              onClearUpiImage={onClearUpiImage}
-            />
+              className="flex items-start gap-3"
+              onDragOver={(event) => {
+                if (isViewMode) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(event) => {
+                if (isViewMode) return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (event.dataTransfer.types.includes("text/field")) {
+                  onFieldDropOnField(category.id, field.key);
+                }
+              }}
+            >
+              {!isViewMode ? (
+                <button
+                  type="button"
+                  draggable
+                  className="mt-2 rounded-lg bg-black/10 p-2 text-black/50"
+                  onDragStart={(event) => {
+                    onFieldDragStart(category.id, field.key);
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/field", field.key);
+                  }}
+                  onDragEnd={onFieldDragEnd}
+                  aria-label={`Move ${field.label}`}
+                >
+                  <MdMenu />
+                </button>
+              ) : null}
+              <div className="flex-1">
+                <FieldRow
+                  field={field}
+                  isViewMode={isViewMode}
+                  value={userData[field.key] ?? ""}
+                  onChange={(value) => onUpdateField(field.key, value)}
+                  isPinned={isPinnedField(field.key)}
+                  onTogglePin={() => onTogglePin(field.key)}
+                  fullNameValue={fullNameValue}
+                  upiQrImage={upiQrImage}
+                  onPasteUpiImage={onPasteUpiImage}
+                  onClearUpiImage={onClearUpiImage}
+                />
+              </div>
+            </div>
           ) : null
         )}
+        {!isViewMode ? (
+          <button
+            type="button"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-black/20 bg-white px-4 py-3 text-sm font-semibold text-black/60"
+            onClick={() => onAddField(category.id)}
+          >
+            <MdAdd className="text-base" />
+            Add field
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -1515,7 +2086,7 @@ function FieldRow({
   onPasteUpiImage,
   onClearUpiImage
 }: FieldRowProps) {
-  const Icon = field.icon;
+  const Icon = resolveIcon(field.iconKey);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const displayValue =
     field.key === "phoneNumber"
