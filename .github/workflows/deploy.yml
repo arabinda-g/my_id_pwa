@@ -52,4 +52,4 @@ jobs:
           PUBLIC_DIR_PATH: ${{ vars.PUBLIC_DIR_PATH }}
         run: |
           if [ -z "${PUBLIC_DIR_PATH}" ]; then echo "PUBLIC_DIR_PATH is not set"; exit 1; fi
-          lftp -u "${SFTP_USER}","${SFTP_PASSWORD}" "sftp://${SFTP_HOST}:${SFTP_PORT:-22}" -e "set cmd:fail-exit yes; set sftp:auto-confirm yes; set net:max-retries 2; set net:persist-retries 2; mirror -R ./dist ${PUBLIC_DIR_PATH} --parallel=2; bye"
+          lftp -u "${SFTP_USER}","${SFTP_PASSWORD}" "sftp://${SFTP_HOST}:${SFTP_PORT:-22}" -e "set cmd:fail-exit yes; set sftp:auto-confirm yes; set net:max-retries 2; set net:persist-retries 2; mirror -R ./dist/ ${PUBLIC_DIR_PATH} --parallel=2; bye"
