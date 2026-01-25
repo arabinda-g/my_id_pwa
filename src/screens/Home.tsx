@@ -253,7 +253,7 @@ const renderUrlValue = (value: string, prefixClass: string, restClass: string) =
   return (
     <>
       <span className={prefixClass}>{parts.prefix}</span>
-      <span className={restClass}>{parts.rest}</span>
+      <span className={`${restClass} break-all`}>{parts.rest}</span>
     </>
   );
 };
@@ -2139,11 +2139,11 @@ function FieldRow({
           <div className="rounded-xl bg-gradient-to-br from-purple-700 to-purple-400 p-3 text-white shadow-sm">
             <Icon className="text-lg" />
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-black/40">
               {field.label}
             </p>
-            <p className="text-base font-semibold text-black/80">{displayNode}</p>
+            <p className="break-words text-base font-semibold text-black/80">{displayNode}</p>
           </div>
           <button
             className="rounded-lg bg-black/5 p-2 text-black/50"
@@ -2198,7 +2198,7 @@ function FieldRow({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={`${field.label}${field.required ? " *" : ""}`}
-        className="w-full rounded-xl bg-[#F3EFEF] px-12 py-3 text-sm text-black placeholder-black/40 outline-none focus:ring-2 focus:ring-purple-700"
+        className="w-full rounded-xl bg-[#F3EFEF] pl-12 pr-32 py-3 text-sm text-black placeholder-black/40 truncate outline-none focus:ring-2 focus:ring-purple-700"
       />
       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-700">
         <Icon />
