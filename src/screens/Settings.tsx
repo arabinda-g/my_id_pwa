@@ -22,6 +22,15 @@ export default function Settings() {
   const [error, setError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<string | null>(null);
 
+  const getExportFilename = () => {
+    const now = new Date();
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(
+      now.getDate()
+    )}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    return `myid-export-${timestamp}.json`;
+  };
+
   const handleExport = async () => {
     const data = await exportData();
     const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -30,7 +39,7 @@ export default function Settings() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "myid-export.json";
+    anchor.download = getExportFilename();
     anchor.click();
     URL.revokeObjectURL(url);
     setMessage("Exported JSON file.");

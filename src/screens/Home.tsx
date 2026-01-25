@@ -425,6 +425,15 @@ export default function Home() {
     window.setTimeout(() => setMessage(null), 2000);
   };
 
+  const getExportFilename = () => {
+    const now = new Date();
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(
+      now.getDate()
+    )}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    return `profile-${timestamp}.enc.json`;
+  };
+
   const handleImagePick = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -628,7 +637,7 @@ export default function Home() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = "profile.enc.json";
+      anchor.download = getExportFilename();
       anchor.click();
       URL.revokeObjectURL(url);
       setIsExportOpen(false);
