@@ -2,9 +2,16 @@ import { useRef, useState } from "react";
 import { exportData, importData, clearQueue, clearUsers } from "../data/db";
 import type { User } from "../data/types";
 import { useTheme } from "../hooks/useTheme";
-
-const PASSKEY_STORAGE_KEY = "my_id_passkey_credential_id";
-const PASSKEY_STARTUP_KEY = "my_id_passkey_on_startup";
+import { Modal } from "../components/Modal";
+import { PasskeyPromptModal } from "../components/PasskeyPromptModal";
+import {
+  decryptExistingData,
+  encryptExistingData,
+  isPasskeyRegistered as hasPasskeyRegistered,
+  passkeyStorageKeys,
+  storeCredentialId,
+  verifyPasskey
+} from "../utils/passkey";
 
 function isValidUser(user: User) {
   return (
@@ -23,24 +30,17 @@ export default function Settings() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isPasskeyRegistered, setIsPasskeyRegistered] = useState(() =>
-    Boolean(localStorage.getItem(PASSKEY_STORAGE_KEY))
-  );
+  const [isPasskeyRegistered, setIsPasskeyRegistered] = useState(() => hasPasskeyRegistered());
   const [passkeyStatus, setPasskeyStatus] = useState<string | null>(() =>
-    localStorage.getItem(PASSKEY_STORAGE_KEY) ? "Passkey registered on this device." : null
+    hasPasskeyRegistered() ? "Passkey registered on this device." : null
   );
   const [isPasskeyRequiredOnStartup, setIsPasskeyRequiredOnStartup] = useState(() =>
-    localStorage.getItem(PASSKEY_STARTUP_KEY) === "true"
+    localStorage.getItem(passkeyStorageKeys.startupRequired) === "true"
   );
-
-  const toBase64Url = (buffer: ArrayBuffer) => {
-    const bytes = new Uint8Array(buffer);
-    let binary = "";
-    bytes.forEach((byte) => {
-      binary += String.fromCharCode(byte);
-    });
-    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-  };
+  const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
+  const [isPasskeyPromptOpen, setIsPasskeyPromptOpen] = useState(false);
+  const [passkeyPromptStatus, setPasskeyPromptStatus] = useState<"verifying" | "success">("verifying");
+  const passkeyAbortRef = useRef<AbortController | null>(null);
 
   const getExportFilename = () => {
     const now = new Date();
@@ -99,6 +99,21 @@ export default function Settings() {
   };
 
   const registerPasskey = async () => {
+    if (isPasskeyRegistered) {
+      const controller = new AbortController();
+      passkeyAbortRef.current?.abort();
+      passkeyAbortRef.current = controller;
+      setIsPasskeyPromptOpen(true);
+      setPasskeyPromptStatus("verifying");
+      const verification = await verifyPasskey(controller.signal);
+      if (!verification.ok) {
+        setIsPasskeyPromptOpen(false);
+        setPasskeyStatus(verification.error ?? "Passkey verification failed.");
+        return;
+      }
+      setPasskeyPromptStatus("success");
+      window.setTimeout(() => setIsPasskeyPromptOpen(false), 450);
+    }
     if (!("PublicKeyCredential" in window)) {
       setPasskeyStatus("Passkeys are not supported in this browser.");
       return;
@@ -139,9 +154,11 @@ export default function Settings() {
         setPasskeyStatus("Passkey registration was cancelled.");
         return;
       }
-      localStorage.setItem(PASSKEY_STORAGE_KEY, toBase64Url(credential.rawId));
+      storeCredentialId(credential.rawId);
       setIsPasskeyRegistered(true);
+      await encryptExistingData();
       setPasskeyStatus("Passkey registered on this device.");
+      window.dispatchEvent(new Event("passkey-change"));
     } catch (err) {
       const messageText =
         err instanceof Error && err.message ? err.message : "Passkey registration failed.";
@@ -149,18 +166,35 @@ export default function Settings() {
     }
   };
 
-  const unregisterPasskey = () => {
-    localStorage.removeItem(PASSKEY_STORAGE_KEY);
-    localStorage.removeItem(PASSKEY_STARTUP_KEY);
+  const unregisterPasskey = async () => {
+    const controller = new AbortController();
+    passkeyAbortRef.current?.abort();
+    passkeyAbortRef.current = controller;
+    setIsPasskeyPromptOpen(true);
+    setPasskeyPromptStatus("verifying");
+    const verification = await verifyPasskey(controller.signal);
+    if (!verification.ok) {
+      setIsPasskeyPromptOpen(false);
+      setPasskeyStatus(verification.error ?? "Passkey verification failed.");
+      return;
+    }
+    setPasskeyPromptStatus("success");
+    window.setTimeout(() => setIsPasskeyPromptOpen(false), 450);
+    await decryptExistingData();
+    localStorage.removeItem(passkeyStorageKeys.credentialId);
+    localStorage.removeItem(passkeyStorageKeys.startupRequired);
+    localStorage.removeItem(passkeyStorageKeys.sectionLocks);
+    localStorage.removeItem(passkeyStorageKeys.fieldLocks);
     setIsPasskeyRegistered(false);
     setIsPasskeyRequiredOnStartup(false);
     setPasskeyStatus("Passkey removed from this device.");
+    window.dispatchEvent(new Event("passkey-change"));
   };
 
   const togglePasskeyOnStartup = () => {
     setIsPasskeyRequiredOnStartup((prev) => {
       const next = !prev;
-      localStorage.setItem(PASSKEY_STARTUP_KEY, String(next));
+      localStorage.setItem(passkeyStorageKeys.startupRequired, String(next));
       return next;
     });
   };
@@ -240,7 +274,7 @@ export default function Settings() {
           {isPasskeyRegistered ? (
             <button
               className="flex-1 rounded-xl border border-rose-500/40 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100"
-              onClick={unregisterPasskey}
+              onClick={() => setIsRemoveConfirmOpen(true)}
             >
               Remove passkey
             </button>
@@ -283,6 +317,49 @@ export default function Settings() {
           {error || message}
         </div>
       )}
+      <Modal isOpen={isRemoveConfirmOpen} onClose={() => setIsRemoveConfirmOpen(false)}>
+        <div className="flex flex-col gap-4 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-700">
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 9v4m0 4h.01M5 20h14l-7-16-7 16z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-lg font-semibold text-black/90">Remove passkey?</p>
+            <p className="mt-1 text-sm text-black/60">
+              This will disable passkey protection and store your data unencrypted on this device.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              className="flex-1 rounded-xl border border-black/10 px-4 py-2 text-sm font-semibold text-black/70"
+              onClick={() => setIsRemoveConfirmOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="flex-1 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white"
+              onClick={async () => {
+                setIsRemoveConfirmOpen(false);
+                await unregisterPasskey();
+              }}
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      </Modal>
+      <PasskeyPromptModal
+        isOpen={isPasskeyPromptOpen}
+        onCancel={() => {
+          passkeyAbortRef.current?.abort();
+          setIsPasskeyPromptOpen(false);
+        }}
+        description="Complete the passkey prompt to continue."
+        status={passkeyPromptStatus}
+      />
     </section>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MdAccountBalance,
   MdAccountBalanceWallet,
@@ -16,6 +16,8 @@ import {
   MdHome,
   MdInfoOutline,
   MdLanguage,
+  MdLock,
+  MdLockOpen,
   MdLocationCity,
   MdMenu,
   MdPayment,
@@ -35,20 +37,32 @@ import {
   clearPinnedFields,
   clearProfileConfig,
   clearUserData,
-  getPinnedFields,
-  getProfileConfig,
   getProfileImage,
-  getUpiQrImage,
-  getUserData,
-  setProfileImage,
-  setPinnedFields as setPinnedFieldsStorage,
-  setProfileConfig,
-  setUpiQrImage as setUpiQrImageStorage,
-  setUserData
+  setProfileImage
 } from "../utils/storage";
 import { Modal } from "../components/Modal";
+import { PasskeyPromptModal } from "../components/PasskeyPromptModal";
 import { QrModal } from "../components/QrModal";
 import Settings from "./Settings";
+import {
+  clearProtectedData,
+  getFieldLocks,
+  getSectionLocks,
+  hasStoredUserData,
+  isPasskeyRegistered,
+  loadFieldValueProtected,
+  loadPinnedFieldsProtected,
+  loadProfileConfigProtected,
+  loadUpiQrImageProtected,
+  loadUserDataProtected,
+  savePinnedFieldsProtected,
+  saveProfileConfigProtected,
+  saveUpiQrImageProtected,
+  saveUserDataProtected,
+  setFieldLocks,
+  setSectionLocks,
+  verifyPasskey
+} from "../utils/passkey";
 
 const iconRegistry = {
   person: MdPerson,
@@ -182,11 +196,11 @@ const parseStoredCategories = (raw: unknown): CategoryConfig[] | null => {
           if (!key || !label || !fieldIconKey) return null;
           return { key, label, iconKey: fieldIconKey, required };
         })
-        .filter((field): field is FieldConfig => Boolean(field));
+        .filter(Boolean) as FieldConfig[];
       const id = typeof entry.id === "string" ? entry.id : createId();
       return { id, title, iconKey, color, fields };
     })
-    .filter((category): category is CategoryConfig => Boolean(category));
+    .filter(Boolean) as CategoryConfig[];
   return parsed.length ? parsed : null;
 };
 
@@ -377,14 +391,13 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
-  const [categories, setCategories] = useState<CategoryConfig[]>(() => {
-    const stored = parseStoredCategories(getProfileConfig());
-    return stored ?? defaultCategories;
-  });
+  const [categories, setCategories] = useState<CategoryConfig[]>(defaultCategories);
   const [userData, setLocalUserData] = useState<Record<string, string>>({});
   const [profileImage, setLocalProfileImage] = useState("");
   const [upiQrImage, setLocalUpiQrImage] = useState("");
   const [pinnedFields, setPinnedFields] = useState<string[]>([]);
+  const [lockedSections, setLockedSections] = useState<string[]>([]);
+  const [lockedFields, setLockedFields] = useState<string[]>([]);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -395,26 +408,66 @@ export default function Home() {
   const [importPassword, setImportPassword] = useState("");
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [passkeyEnabled, setPasskeyEnabled] = useState(isPasskeyRegistered());
   const [message, setMessage] = useState<{ text: string; tone: "ok" | "warn" | "error" } | null>(
     null
   );
+  const [isPasskeyPromptOpen, setIsPasskeyPromptOpen] = useState(false);
+  const [passkeyPromptStatus, setPasskeyPromptStatus] = useState<"verifying" | "success">("verifying");
+  const passkeyAbortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    const data = getUserData();
-    setLocalUserData(data);
-    setIsViewMode(Object.values(data).some((value) => value.trim().length > 0));
-    setLocalProfileImage(getProfileImage());
-    setLocalUpiQrImage(getUpiQrImage());
-    const storedPinned = getPinnedFields();
+  const loadFromStorage = useCallback(async () => {
+    const storedConfig = parseStoredCategories(await loadProfileConfigProtected());
+    const nextCategories = storedConfig ?? defaultCategories;
+    const sectionLocks = getSectionLocks();
+    const fieldLocks = getFieldLocks();
+    const data = await loadUserDataProtected(
+      nextCategories,
+      new Set(sectionLocks),
+      new Set(fieldLocks),
+      false
+    );
+    const hasData = isPasskeyRegistered()
+      ? hasStoredUserData()
+      : Object.values(data).some((value) => value.trim().length > 0);
+    const storedPinned = await loadPinnedFieldsProtected();
     const normalizedPinned = normalizePinnedFields(storedPinned);
+    const upiImage = await loadUpiQrImageProtected();
+    const upiLocked =
+      fieldLocks.includes("upiAddress") ||
+      nextCategories.some(
+        (category) =>
+          sectionLocks.includes(category.id) &&
+          category.fields.some((field) => field.key === "upiAddress")
+      );
+    setPasskeyEnabled(isPasskeyRegistered());
+    setCategories(nextCategories);
+    setLockedSections(sectionLocks);
+    setLockedFields(fieldLocks);
+    setLocalUserData(data);
+    setIsViewMode(hasData);
+    setLocalProfileImage(getProfileImage());
+    setLocalUpiQrImage(upiLocked ? "" : upiImage);
     setPinnedFields(normalizedPinned);
     if (storedPinned.join("|") !== normalizedPinned.join("|")) {
-      setPinnedFieldsStorage(normalizedPinned);
+      await savePinnedFieldsProtected(normalizedPinned);
     }
   }, []);
 
   useEffect(() => {
-    setProfileConfig(categories);
+    void loadFromStorage();
+  }, [loadFromStorage]);
+
+  useEffect(() => {
+    const handlePasskeyChange = () => {
+      void loadFromStorage();
+    };
+    window.addEventListener("passkey-change", handlePasskeyChange);
+    return () => window.removeEventListener("passkey-change", handlePasskeyChange);
+  }, [loadFromStorage]);
+
+  useEffect(() => {
+    void saveProfileConfigProtected(categories);
   }, [categories]);
 
   const userName = useMemo(() => userData["firstName"] || "User", [userData]);
@@ -424,6 +477,160 @@ export default function Home() {
   const showMessage = (text: string, tone: "ok" | "warn" | "error") => {
     setMessage({ text, tone });
     window.setTimeout(() => setMessage(null), 2000);
+  };
+
+  const requirePasskey = async () => {
+    if (!passkeyEnabled) return true;
+    const controller = new AbortController();
+    passkeyAbortRef.current?.abort();
+    passkeyAbortRef.current = controller;
+    setIsPasskeyPromptOpen(true);
+    setPasskeyPromptStatus("verifying");
+    const result = await verifyPasskey(controller.signal);
+    if (result.ok) {
+      setPasskeyPromptStatus("success");
+      window.setTimeout(() => setIsPasskeyPromptOpen(false), 450);
+    } else {
+      setIsPasskeyPromptOpen(false);
+    }
+    if (!result.ok) {
+      showMessage(result.error ?? "Passkey verification failed.", "error");
+      return false;
+    }
+    return true;
+  };
+
+  const isFieldLocked = (fieldKey: string) => {
+    if (!passkeyEnabled) return false;
+    if (lockedFields.includes(fieldKey)) return true;
+    const section = categories.find((category) =>
+      category.fields.some((field) => field.key === fieldKey)
+    );
+    return section ? lockedSections.includes(section.id) : false;
+  };
+
+  const refreshViewData = async () => {
+    const data = await loadUserDataProtected(
+      categories,
+      new Set(lockedSections),
+      new Set(lockedFields),
+      false
+    );
+    setLocalUserData(data);
+    const upiLocked = isFieldLocked("upiAddress");
+    setLocalUpiQrImage(upiLocked ? "" : await loadUpiQrImageProtected());
+  };
+
+  const enterEditMode = async () => {
+    const verified = await requirePasskey();
+    if (!verified) return;
+    const data = await loadUserDataProtected(categories, new Set(), new Set(), true);
+    setLocalUserData(data);
+    setLocalUpiQrImage(await loadUpiQrImageProtected());
+    setIsViewMode(false);
+  };
+
+  const lockSection = (sectionId: string) => {
+    if (!passkeyEnabled) return;
+    const updated = Array.from(new Set([...lockedSections, sectionId]));
+    setLockedSections(updated);
+    setSectionLocks(updated);
+    const section = categories.find((category) => category.id === sectionId);
+    if (!section) return;
+    if (isViewMode) {
+      setLocalUserData((prev) => {
+        const next = { ...prev };
+        section.fields.forEach((field) => {
+          delete next[field.key];
+        });
+        return next;
+      });
+      if (section.fields.some((field) => field.key === "upiAddress")) {
+        setLocalUpiQrImage("");
+      }
+    }
+  };
+
+  const unlockSection = async (sectionId: string) => {
+    const verified = await requirePasskey();
+    if (!verified) return;
+    const updated = lockedSections.filter((id) => id !== sectionId);
+    setLockedSections(updated);
+    setSectionLocks(updated);
+    const data = await loadUserDataProtected(categories, new Set(updated), new Set(lockedFields), false);
+    setLocalUserData(data);
+    const upiLocked =
+      lockedFields.includes("upiAddress") ||
+      categories.some(
+        (category) =>
+          category.id !== sectionId &&
+          updated.includes(category.id) &&
+          category.fields.some((field) => field.key === "upiAddress")
+      );
+    setLocalUpiQrImage(upiLocked ? "" : await loadUpiQrImageProtected());
+  };
+
+  const lockField = (fieldKey: string) => {
+    if (!passkeyEnabled) return;
+    const updated = Array.from(new Set([...lockedFields, fieldKey]));
+    setLockedFields(updated);
+    setFieldLocks(updated);
+    if (isViewMode) {
+      setLocalUserData((prev) => {
+        const next = { ...prev };
+        delete next[fieldKey];
+        return next;
+      });
+      if (fieldKey === "upiAddress") {
+        setLocalUpiQrImage("");
+      }
+    }
+  };
+
+  const unlockField = async (fieldKey: string) => {
+    const verified = await requirePasskey();
+    if (!verified) return;
+    const updated = lockedFields.filter((key) => key !== fieldKey);
+    setLockedFields(updated);
+    setFieldLocks(updated);
+    const section = categories.find((category) => category.fields.some((field) => field.key === fieldKey));
+    if (section && lockedSections.includes(section.id)) {
+      return;
+    }
+    const value = await loadFieldValueProtected(fieldKey);
+    setLocalUserData((prev) => ({ ...prev, [fieldKey]: value }));
+    if (fieldKey === "upiAddress") {
+      setLocalUpiQrImage(await loadUpiQrImageProtected());
+    }
+  };
+
+  const toggleSectionLock = (sectionId: string) => {
+    if (!passkeyEnabled) return;
+    if (lockedSections.includes(sectionId)) {
+      void unlockSection(sectionId);
+    } else {
+      lockSection(sectionId);
+    }
+  };
+
+  const toggleFieldLock = (fieldKey: string) => {
+    if (!passkeyEnabled) return;
+    if (lockedFields.includes(fieldKey)) {
+      void unlockField(fieldKey);
+    } else {
+      lockField(fieldKey);
+    }
+  };
+
+  const revealPinnedValue = async (fieldKey: string) => {
+    const verified = await requirePasskey();
+    if (!verified) return "";
+    if (fieldKey === NAME_PIN_KEY) {
+      const first = await loadFieldValueProtected("firstName");
+      const last = await loadFieldValueProtected("lastName");
+      return [first, last].filter(Boolean).join(" ").trim();
+    }
+    return loadFieldValueProtected(fieldKey);
   };
 
   const getExportFilename = () => {
@@ -488,7 +695,7 @@ export default function Home() {
     setLocalUserData((prev) => ({ ...prev, [key]: value }));
   };
 
-  const saveUserInfo = () => {
+  const saveUserInfo = async () => {
     const missingFields: string[] = [];
     categories.forEach((category) => {
       category.fields.forEach((field) => {
@@ -513,9 +720,13 @@ export default function Home() {
       return;
     }
 
-    setUserData(cleaned);
-    setLocalUserData(cleaned);
+    await saveUserDataProtected(cleaned);
     setIsViewMode(true);
+    if (passkeyEnabled) {
+      await refreshViewData();
+    } else {
+      setLocalUserData(cleaned);
+    }
     showMessage("Data saved successfully!", "ok");
   };
 
@@ -533,7 +744,9 @@ export default function Home() {
   const categoryCompletion = (category: CategoryConfig) =>
     category.fields.filter((field) => userData[field.key]?.trim().length).length;
 
-  const hasAnyData = Object.values(userData).some((value) => value.trim().length > 0);
+  const hasAnyData = passkeyEnabled
+    ? hasStoredUserData()
+    : Object.values(userData).some((value) => value.trim().length > 0);
   const qrData = useMemo(() => buildVCard(userData), [userData]);
 
   const toBase64 = (buffer: ArrayBuffer) => {
@@ -618,15 +831,21 @@ export default function Home() {
       showMessage("Please enter a password", "warn");
       return;
     }
+    if (passkeyEnabled) {
+      const verified = await requirePasskey();
+      if (!verified) return;
+    }
     setIsExporting(true);
-    const data = getUserData();
+    const data = await loadUserDataProtected(categories, new Set(), new Set(), true);
+    const pinned = await loadPinnedFieldsProtected();
+    const upiImage = await loadUpiQrImageProtected();
     const exportPayload = {
       version: 1,
       profile: {
         userData: data,
         profileImage: getProfileImage(),
-        pinnedFields: getPinnedFields(),
-        upiQrImage: getUpiQrImage(),
+        pinnedFields: pinned,
+        upiQrImage: upiImage,
         categories
       }
     };
@@ -658,6 +877,10 @@ export default function Home() {
   };
 
   const handleImportConfirm = async () => {
+    if (passkeyEnabled) {
+      const verified = await requirePasskey();
+      if (!verified) return;
+    }
     if (!pendingImportFile) return;
     const trimmedPassword = importPassword.trim();
     if (!trimmedPassword) {
@@ -715,16 +938,23 @@ export default function Home() {
         throw new Error("Invalid profile config");
       }
       const normalizedPinned = normalizePinnedFields(pinned);
-      setUserData(data);
-      setPinnedFieldsStorage(normalizedPinned);
-      setLocalUserData(data);
+      await saveUserDataProtected(data);
+      await savePinnedFieldsProtected(normalizedPinned);
       setProfileImage(image);
       setLocalProfileImage(image);
-      setUpiQrImageStorage(upiImage);
-      setLocalUpiQrImage(upiImage);
+      await saveUpiQrImageProtected(upiImage);
       setPinnedFields(normalizedPinned);
       setCategories(importedCategories);
-      setIsViewMode(Object.values(data).some((value) => value.trim().length > 0));
+      setLockedSections([]);
+      setLockedFields([]);
+      setSectionLocks([]);
+      setFieldLocks([]);
+      setIsViewMode(
+        passkeyEnabled
+          ? hasStoredUserData()
+          : Object.values(data).some((value) => value.trim().length > 0)
+      );
+      await refreshViewData();
       showMessage("Profile imported", "ok");
     } catch {
       showMessage("Import failed", "error");
@@ -738,16 +968,24 @@ export default function Home() {
   };
 
   const handleClear = () => {
-    clearUserData();
-    clearPinnedFields();
-    clearProfileConfig();
+    if (isPasskeyRegistered()) {
+      clearProtectedData();
+    } else {
+      clearUserData();
+      clearPinnedFields();
+      clearProfileConfig();
+    }
     setProfileImage("");
     setLocalUserData({});
     setIsViewMode(false);
     setPinnedFields([]);
-    setUpiQrImageStorage("");
+    void saveUpiQrImageProtected("");
     setLocalUpiQrImage("");
     setCategories(defaultCategories);
+    setLockedSections([]);
+    setLockedFields([]);
+    setSectionLocks([]);
+    setFieldLocks([]);
     showMessage("Profile cleared", "ok");
   };
 
@@ -797,7 +1035,7 @@ export default function Home() {
                 style={{ background: "linear-gradient(135deg, #f97316, #fdba74)" }}
                 onClick={() => {
                   setIsDrawerOpen(false);
-                  setIsViewMode(false);
+                  void enterEditMode();
                 }}
               >
                 <span className="rounded-lg bg-white/20 p-2">
@@ -832,7 +1070,11 @@ export default function Home() {
                 className="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-white"
                 onClick={() => {
                   setIsDrawerOpen(false);
-                  setIsSettingsOpen(true);
+                  void (async () => {
+                    const verified = await requirePasskey();
+                    if (!verified) return;
+                    setIsSettingsOpen(true);
+                  })();
                 }}
               >
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-100 text-purple-700 shadow-sm">
@@ -909,6 +1151,12 @@ export default function Home() {
           profileImage={profileImage}
           upiQrImage={upiQrImage}
           pinnedFields={pinnedFields}
+          passkeyEnabled={passkeyEnabled}
+          lockedSections={lockedSections}
+          lockedFields={lockedFields}
+          onToggleSectionLock={toggleSectionLock}
+          onToggleFieldLock={toggleFieldLock}
+          onRevealPinnedValue={revealPinnedValue}
           onTogglePin={(key) => {
             setPinnedFields((prev) => {
               const normalized = normalizePinnedFields(prev);
@@ -922,19 +1170,18 @@ export default function Home() {
                   ? normalized.filter((item) => item !== key)
                   : [...normalized, key];
               }
-              setPinnedFieldsStorage(updated);
+              void savePinnedFieldsProtected(updated);
               return updated;
             });
           }}
           onReorderPinned={(fields) => {
             const normalized = normalizePinnedFields(fields);
-            setPinnedFieldsStorage(normalized);
+            void savePinnedFieldsProtected(normalized);
             setPinnedFields(normalized);
           }}
           onChangeCategories={setCategories}
           onUpdateField={updateField}
           onSave={saveUserInfo}
-          onSwitchToEdit={() => setIsViewMode(false)}
           onShareQR={() => {
             if (!hasAnyData) {
               showMessage("Please save your information first", "warn");
@@ -952,12 +1199,12 @@ export default function Home() {
           onPasteUpiImage={async () => {
             const dataUrl = await readClipboardImage();
             if (!dataUrl) return;
-            setUpiQrImageStorage(dataUrl);
+            await saveUpiQrImageProtected(dataUrl);
             setLocalUpiQrImage(dataUrl);
             showMessage("UPI QR image pasted", "ok");
           }}
           onClearUpiImage={() => {
-            setUpiQrImageStorage("");
+            void saveUpiQrImageProtected("");
             setLocalUpiQrImage("");
           }}
         />
@@ -1106,8 +1353,14 @@ export default function Home() {
               className="flex-1 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white"
               onClick={() => {
                 setIsClearConfirmOpen(false);
-                setIsDrawerOpen(false);
-                handleClear();
+                void (async () => {
+                  if (passkeyEnabled) {
+                    const verified = await requirePasskey();
+                    if (!verified) return;
+                  }
+                  setIsDrawerOpen(false);
+                  handleClear();
+                })();
               }}
             >
               Clear data
@@ -1115,6 +1368,14 @@ export default function Home() {
           </div>
         </div>
       </Modal>
+      <PasskeyPromptModal
+        isOpen={isPasskeyPromptOpen}
+        onCancel={() => {
+          passkeyAbortRef.current?.abort();
+          setIsPasskeyPromptOpen(false);
+        }}
+        status={passkeyPromptStatus}
+      />
     </div>
   );
 }
@@ -1126,12 +1387,14 @@ type UserInfoFormProps = {
   profileImage: string;
   upiQrImage: string;
   pinnedFields: string[];
+  passkeyEnabled: boolean;
+  lockedSections: string[];
+  lockedFields: string[];
   onTogglePin: (key: string) => void;
   onReorderPinned: (fields: string[]) => void;
   onChangeCategories: React.Dispatch<React.SetStateAction<CategoryConfig[]>>;
   onUpdateField: (key: string, value: string) => void;
   onSave: () => void;
-  onSwitchToEdit: () => void;
   onShareQR: () => void;
   completionPercentage: number;
   categoryCompletion: (category: CategoryConfig) => number;
@@ -1139,6 +1402,9 @@ type UserInfoFormProps = {
   onClearImage: () => void;
   onPasteUpiImage: () => void;
   onClearUpiImage: () => void;
+  onToggleSectionLock: (sectionId: string) => void;
+  onToggleFieldLock: (fieldKey: string) => void;
+  onRevealPinnedValue: (fieldKey: string) => Promise<string>;
 };
 
 function UserInfoForm({
@@ -1148,19 +1414,24 @@ function UserInfoForm({
   profileImage,
   upiQrImage,
   pinnedFields,
+  passkeyEnabled,
+  lockedSections,
+  lockedFields,
   onTogglePin,
   onReorderPinned,
   onChangeCategories,
   onUpdateField,
   onSave,
-  onSwitchToEdit,
   onShareQR,
   completionPercentage,
   categoryCompletion,
   onPickImage,
   onClearImage,
   onPasteUpiImage,
-  onClearUpiImage
+  onClearUpiImage,
+  onToggleSectionLock,
+  onToggleFieldLock,
+  onRevealPinnedValue
 }: UserInfoFormProps) {
   const profileInputRef = useRef<HTMLInputElement | null>(null);
   const [isProfileImageOpen, setIsProfileImageOpen] = useState(false);
@@ -1199,12 +1470,22 @@ function UserInfoForm({
     return new Map(entries);
   }, [categories]);
 
+  const isFieldLockedForView = (fieldKey: string) => {
+    if (!passkeyEnabled) return false;
+    if (lockedFields.includes(fieldKey)) return true;
+    const section = categories.find((category) =>
+      category.fields.some((field) => field.key === fieldKey)
+    );
+    return section ? lockedSections.includes(section.id) : false;
+  };
+
   const pinnedQuickInfo = useMemo<
     {
       key: string;
       label: string;
       value: string;
       Icon: React.ComponentType<{ className?: string }>;
+      isLocked: boolean;
     }[]
   >(() => {
     const items: {
@@ -1212,33 +1493,49 @@ function UserInfoForm({
       label: string;
       value: string;
       Icon: React.ComponentType<{ className?: string }>;
+      isLocked: boolean;
     }[] = [];
+
+    const isFieldLockedBySection = (fieldKey: string) => {
+      const section = categories.find((category) =>
+        category.fields.some((field) => field.key === fieldKey)
+      );
+      return section ? lockedSections.includes(section.id) : false;
+    };
 
     pinnedFields.forEach((key) => {
       if (key === NAME_PIN_KEY) {
-        if (!fullNameValue) return;
+        const isLocked =
+          lockedFields.includes("firstName") ||
+          lockedFields.includes("lastName") ||
+          isFieldLockedBySection("firstName") ||
+          isFieldLockedBySection("lastName");
+        if (!fullNameValue && !isLocked) return;
         items.push({
           key: NAME_PIN_KEY,
           label: "Name",
-          value: fullNameValue,
-          Icon: MdPerson
+          value: isLocked ? "" : fullNameValue,
+          Icon: MdPerson,
+          isLocked
         });
         return;
       }
-      const value = userData[key]?.trim() ?? "";
-      if (!value) return;
+      const isLocked = lockedFields.includes(key) || isFieldLockedBySection(key);
+      const value = isLocked ? "" : userData[key]?.trim() ?? "";
+      if (!value && !isLocked) return;
       const field = fieldConfigMap.get(key);
       const Icon = resolveIcon(field?.iconKey);
       items.push({
         key,
         label: field?.label ?? key,
         value,
-        Icon
+        Icon,
+        isLocked
       });
     });
 
     return items;
-  }, [fieldConfigMap, fullNameValue, pinnedFields, userData]);
+  }, [categories, fieldConfigMap, fullNameValue, lockedFields, lockedSections, pinnedFields, userData]);
 
   const pinnedQuickInfoEditable = useMemo(() => {
     return pinnedFields.map((key) => {
@@ -1357,32 +1654,9 @@ function UserInfoForm({
     setNewFieldRequired(false);
   };
 
-  const buildQuickAction = (
-    icon: React.ComponentType<{ className?: string }>,
-    label: string,
-    color: string,
-    onTap: () => void
-  ) => {
-    const Icon = icon;
-    return (
-      <button
-        className="flex w-full flex-col items-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold"
-        onClick={onTap}
-        style={{ borderColor: `${color}33`, background: `linear-gradient(135deg, ${color}1A, ${color}0D)` }}
-      >
-        <span
-          className="rounded-lg p-2"
-          style={{ backgroundColor: `${color}33`, color }}
-        >
-          <Icon className="text-lg" />
-        </span>
-        <span style={{ color }}>{label}</span>
-      </button>
-    );
-  };
-
   const shouldShowCategory = (category: CategoryConfig) => {
     if (!isViewMode) return true;
+    if (lockedSections.includes(category.id)) return true;
     return category.fields.some((field) =>
       field.key === "upiAddress"
         ? Boolean(userData[field.key]?.trim().length || upiQrImage)
@@ -1392,6 +1666,7 @@ function UserInfoForm({
 
   const shouldShowField = (key: string) => {
     if (!isViewMode) return true;
+    if (isFieldLockedForView(key)) return true;
     if (key === "upiAddress") {
       return Boolean(userData[key]?.trim().length || upiQrImage);
     }
@@ -1451,11 +1726,24 @@ function UserInfoForm({
                 {pinnedQuickInfo.map((item) => (
                   <button
                     key={item.key}
-                    className="flex h-12 w-12 items-center justify-center rounded-2xl border-2 border-purple-200/80 bg-gradient-to-br from-white to-gray-50 text-purple-700 shadow-sm"
-                    onClick={() => setQuickInfoOpen(item)}
+                    className="relative flex h-12 w-12 items-center justify-center rounded-2xl border-2 border-purple-200/80 bg-gradient-to-br from-white to-gray-50 text-purple-700 shadow-sm"
+                    onClick={async () => {
+                      if (item.isLocked) {
+                        const revealed = await onRevealPinnedValue(item.key);
+                        if (!revealed) return;
+                        setQuickInfoOpen({ ...item, value: revealed });
+                        return;
+                      }
+                      setQuickInfoOpen(item);
+                    }}
                     aria-label={`Open ${item.label}`}
                   >
                     <item.Icon className="text-xl" />
+                    {item.isLocked ? (
+                      <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black text-white">
+                        <MdLock className="text-xs" />
+                      </span>
+                    ) : null}
                   </button>
                 ))}
               </div>
@@ -1587,10 +1875,15 @@ function UserInfoForm({
               key={category.id}
               category={category}
               isViewMode={isViewMode}
+              passkeyEnabled={passkeyEnabled}
               userData={userData}
               onUpdateField={onUpdateField}
               pinnedFields={pinnedFields}
               onTogglePin={onTogglePin}
+              lockedSections={lockedSections}
+              lockedFields={lockedFields}
+              onToggleSectionLock={onToggleSectionLock}
+              onToggleFieldLock={onToggleFieldLock}
               categoryCompletion={categoryCompletion(category)}
               shouldShowField={shouldShowField}
               fullNameValue={fullNameValue}
@@ -1868,10 +2161,15 @@ function UserInfoForm({
 type CategorySectionProps = {
   category: CategoryConfig;
   isViewMode: boolean;
+  passkeyEnabled: boolean;
   userData: Record<string, string>;
   onUpdateField: (key: string, value: string) => void;
   pinnedFields: string[];
   onTogglePin: (key: string) => void;
+  lockedSections: string[];
+  lockedFields: string[];
+  onToggleSectionLock: (categoryId: string) => void;
+  onToggleFieldLock: (fieldKey: string) => void;
   categoryCompletion: number;
   shouldShowField: (key: string) => boolean;
   fullNameValue: string;
@@ -1893,10 +2191,15 @@ type CategorySectionProps = {
 function CategorySection({
   category,
   isViewMode,
+  passkeyEnabled,
   userData,
   onUpdateField,
   pinnedFields,
   onTogglePin,
+  lockedSections,
+  lockedFields,
+  onToggleSectionLock,
+  onToggleFieldLock,
   categoryCompletion,
   shouldShowField,
   fullNameValue,
@@ -1918,6 +2221,9 @@ function CategorySection({
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
   const isPinnedField = (key: string) =>
     isNameField(key) ? pinnedFields.includes(NAME_PIN_KEY) : pinnedFields.includes(key);
+  const isSectionLocked = passkeyEnabled && lockedSections.includes(category.id);
+  const isFieldLocked = (fieldKey: string) =>
+    passkeyEnabled && (lockedFields.includes(fieldKey) || isSectionLocked);
   return (
     <div
       className="overflow-hidden rounded-3xl border bg-white shadow-lg"
@@ -2002,10 +2308,27 @@ function CategorySection({
             >
               {categoryCompletion}/{category.fields.length}
             </span>
+            {passkeyEnabled ? (
+              <button
+                type="button"
+                className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                  isSectionLocked ? "bg-black/10 text-black/60" : "bg-green-100 text-green-700"
+                }`}
+                onClick={() => onToggleSectionLock(category.id)}
+              >
+                {isSectionLocked ? <MdLock className="text-sm" /> : <MdLockOpen className="text-sm" />}
+                {isSectionLocked ? "Locked" : "Unlocked"}
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
       <div className="space-y-3 px-5 py-5">
+        {isViewMode && isSectionLocked ? (
+          <div className="rounded-2xl border border-dashed border-black/10 bg-black/[0.02] px-4 py-3 text-sm text-black/60">
+            Unlock this section to view details.
+          </div>
+        ) : null}
         {category.fields.map((field) =>
           shouldShowField(field.key) ? (
             <div
@@ -2046,9 +2369,12 @@ function CategorySection({
                   field={field}
                   isViewMode={isViewMode}
                   value={userData[field.key] ?? ""}
+                  isLocked={isFieldLocked(field.key)}
+                  showLockToggle={passkeyEnabled && !isViewMode}
                   onChange={(value) => onUpdateField(field.key, value)}
                   isPinned={isPinnedField(field.key)}
                   onTogglePin={() => onTogglePin(field.key)}
+                  onToggleLock={() => onToggleFieldLock(field.key)}
                   fullNameValue={fullNameValue}
                   upiQrImage={upiQrImage}
                   onPasteUpiImage={onPasteUpiImage}
@@ -2121,9 +2447,12 @@ type FieldRowProps = {
   field: FieldConfig;
   isViewMode: boolean;
   value: string;
+  isLocked: boolean;
+  showLockToggle: boolean;
   onChange: (value: string) => void;
   isPinned: boolean;
   onTogglePin: () => void;
+  onToggleLock: () => void;
   fullNameValue: string;
   upiQrImage: string;
   onPasteUpiImage: () => void;
@@ -2134,9 +2463,12 @@ function FieldRow({
   field,
   isViewMode,
   value,
+  isLocked,
+  showLockToggle,
   onChange,
   isPinned,
   onTogglePin,
+  onToggleLock,
   fullNameValue,
   upiQrImage,
   onPasteUpiImage,
@@ -2153,12 +2485,18 @@ function FieldRow({
   const isName = isNameField(field.key);
   const isUpi = field.key === "upiAddress";
   const modalValue = isName ? fullNameValue : displayValue;
-  const canOpenModal = isName
-    ? Boolean(fullNameValue)
-    : isUpi
-      ? Boolean(value || upiQrImage)
-      : Boolean(value);
-  const displayText = isUpi && !displayValue && upiQrImage ? "QR image added" : displayValue;
+  const canOpenModal = isLocked
+    ? true
+    : isName
+      ? Boolean(fullNameValue)
+      : isUpi
+        ? Boolean(value || upiQrImage)
+        : Boolean(value);
+  const displayText = isLocked
+    ? "Locked"
+    : isUpi && !displayValue && upiQrImage
+      ? "QR image added"
+      : displayValue;
   const displayNode = isUrlValue(displayText)
     ? renderUrlValue(displayText, "text-black/40", "text-black/80")
     : displayText;
@@ -2173,12 +2511,20 @@ function FieldRow({
           tabIndex={canOpenModal ? 0 : -1}
           onClick={() => {
             if (!canOpenModal) return;
+            if (isLocked) {
+              onToggleLock();
+              return;
+            }
             setIsZoomOpen(true);
           }}
           onKeyDown={(event) => {
             if (!canOpenModal) return;
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
+              if (isLocked) {
+                onToggleLock();
+                return;
+              }
               setIsZoomOpen(true);
             }
           }}
@@ -2193,16 +2539,31 @@ function FieldRow({
             <p className="break-words text-base font-semibold text-black/80">{displayNode}</p>
           </div>
           <button
-            className="rounded-lg bg-black/5 p-2 text-black/50"
+            className="rounded-lg bg-black/5 p-2 text-black/50 disabled:opacity-40"
             onClick={(event) => {
               event.stopPropagation();
-              if (!value) return;
+              if (!value || isLocked) return;
               navigator.clipboard.writeText(value);
             }}
             aria-label={`Copy ${field.label}`}
+            disabled={!value || isLocked}
           >
             <MdContentCopy />
           </button>
+          {showLockToggle ? (
+            <button
+              className={`ml-2 rounded-lg p-2 ${
+                isLocked ? "bg-black/10 text-black/60" : "bg-green-100 text-green-700"
+              }`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleLock();
+              }}
+              aria-label={isLocked ? `Unlock ${field.label}` : `Lock ${field.label}`}
+            >
+              {isLocked ? <MdLock /> : <MdLockOpen />}
+            </button>
+          ) : null}
         </div>
         <Modal isOpen={isZoomOpen} onClose={() => setIsZoomOpen(false)}>
           <div className="relative flex flex-col items-center gap-4 text-center">
@@ -2251,6 +2612,18 @@ function FieldRow({
         <Icon />
       </span>
       <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1">
+        {showLockToggle ? (
+          <button
+            className={`rounded-md p-1 ${
+              isLocked ? "bg-black/10 text-black/60" : "bg-green-100 text-green-700"
+            }`}
+            onClick={onToggleLock}
+            aria-label={isLocked ? `Unlock ${field.label}` : `Lock ${field.label}`}
+            type="button"
+          >
+            {isLocked ? <MdLock /> : <MdLockOpen />}
+          </button>
+        ) : null}
         <button
           className={`rounded-md p-1 ${
             isPinned ? "bg-purple-100 text-purple-700" : "bg-black/5 text-black/50"
