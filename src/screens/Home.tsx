@@ -551,12 +551,14 @@ export default function Home() {
     }
   };
 
-  const unlockSection = async (sectionId: string) => {
+  const unlockSection = async (sectionId: string, persist = true) => {
     const verified = await requirePasskey();
     if (!verified) return;
     const updated = lockedSections.filter((id) => id !== sectionId);
     setLockedSections(updated);
-    setSectionLocks(updated);
+    if (persist) {
+      setSectionLocks(updated);
+    }
     const data = await loadUserDataProtected(categories, new Set(updated), new Set(lockedFields), false);
     setLocalUserData(data);
     const upiLocked =
@@ -620,7 +622,7 @@ export default function Home() {
   const toggleSectionLock = (sectionId: string) => {
     if (!passkeyEnabled) return;
     if (lockedSections.includes(sectionId)) {
-      void unlockSection(sectionId);
+      void unlockSection(sectionId, !isViewMode);
     } else {
       lockSection(sectionId);
     }
@@ -2250,7 +2252,7 @@ function CategorySection({
     isNameField(key) ? pinnedFields.includes(NAME_PIN_KEY) : pinnedFields.includes(key);
   const isSectionLocked = passkeyEnabled && lockedSections.includes(category.id);
   const isFieldLocked = (fieldKey: string) =>
-    passkeyEnabled && (lockedFields.includes(fieldKey) || isSectionLocked);
+    passkeyEnabled && (lockedFields.includes(fieldKey) || (isViewMode && isSectionLocked));
   return (
     <div
       className="overflow-hidden rounded-3xl border bg-white shadow-lg"
@@ -2348,6 +2350,15 @@ function CategorySection({
               </button>
             ) : null}
           </div>
+        ) : passkeyEnabled && isSectionLocked ? (
+          <button
+            type="button"
+            className="flex items-center gap-2 rounded-full bg-black/10 px-3 py-1 text-xs font-semibold text-black/60"
+            onClick={() => onToggleSectionLock(category.id)}
+          >
+            <MdLock className="text-sm" />
+            Unlock
+          </button>
         ) : null}
       </div>
       <div className="space-y-3 px-5 py-5">

@@ -19,10 +19,12 @@
 - Removing or re-registering passkey requires verification of the existing passkey.
 
 ## Locks (Sections & Fields)
-- Lock controls show only in Edit mode.
+- Lock controls show in Edit mode; locked sections show unlock in View mode.
+- Sections can be locked in Edit mode and unlocked in View mode.
 - Each section and each field can be locked.
 - Locked items must require an extra passkey verification to unlock in View mode.
 - Unlocking a section does not unlock any locked fields inside it.
+- Unlocking a section in View mode is temporary (reload stays locked).
 - If a pinned field is locked, opening it must require passkey verification.
 - Locked fields are still clickable in View mode to trigger unlock.
 - Entering Edit mode unlocks everything for that session (no lock gating in edit).
