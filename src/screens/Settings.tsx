@@ -40,7 +40,9 @@ export default function Settings() {
   const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
   const [isPasskeyPromptOpen, setIsPasskeyPromptOpen] = useState(false);
   const [passkeyPromptStatus, setPasskeyPromptStatus] = useState<"verifying" | "success">("verifying");
+  const [passkeyPromptMode, setPasskeyPromptMode] = useState<"verify" | "register">("verify");
   const passkeyAbortRef = useRef<AbortController | null>(null);
+  const passkeyCancelRef = useRef(false);
 
   const getExportFilename = () => {
     const now = new Date();
@@ -99,11 +101,13 @@ export default function Settings() {
   };
 
   const registerPasskey = async () => {
+    passkeyCancelRef.current = false;
     if (isPasskeyRegistered) {
       const controller = new AbortController();
       passkeyAbortRef.current?.abort();
       passkeyAbortRef.current = controller;
       setIsPasskeyPromptOpen(true);
+      setPasskeyPromptMode("verify");
       setPasskeyPromptStatus("verifying");
       const verification = await verifyPasskey(controller.signal);
       if (!verification.ok) {
@@ -118,6 +122,9 @@ export default function Settings() {
       setPasskeyStatus("Passkeys are not supported in this browser.");
       return;
     }
+    setPasskeyPromptMode("register");
+    setPasskeyPromptStatus("verifying");
+    setIsPasskeyPromptOpen(true);
     try {
       const hasPlatformAuth =
         typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function"
@@ -125,6 +132,7 @@ export default function Settings() {
           : true;
       if (!hasPlatformAuth) {
         setPasskeyStatus("No built-in authenticator available on this device.");
+        setIsPasskeyPromptOpen(false);
         return;
       }
       const challenge = crypto.getRandomValues(new Uint8Array(32));
@@ -150,19 +158,27 @@ export default function Settings() {
       const credential = (await navigator.credentials.create({
         publicKey
       })) as PublicKeyCredential | null;
+      if (passkeyCancelRef.current) {
+        setIsPasskeyPromptOpen(false);
+        return;
+      }
       if (!credential) {
         setPasskeyStatus("Passkey registration was cancelled.");
+        setIsPasskeyPromptOpen(false);
         return;
       }
       storeCredentialId(credential.rawId);
       setIsPasskeyRegistered(true);
       await encryptExistingData();
       setPasskeyStatus("Passkey registered on this device.");
+      setPasskeyPromptStatus("success");
+      window.setTimeout(() => setIsPasskeyPromptOpen(false), 450);
       window.dispatchEvent(new Event("passkey-change"));
     } catch (err) {
       const messageText =
         err instanceof Error && err.message ? err.message : "Passkey registration failed.";
       setPasskeyStatus(messageText);
+      setIsPasskeyPromptOpen(false);
     }
   };
 
@@ -171,6 +187,7 @@ export default function Settings() {
     passkeyAbortRef.current?.abort();
     passkeyAbortRef.current = controller;
     setIsPasskeyPromptOpen(true);
+    setPasskeyPromptMode("verify");
     setPasskeyPromptStatus("verifying");
     const verification = await verifyPasskey(controller.signal);
     if (!verification.ok) {
@@ -269,7 +286,7 @@ export default function Settings() {
             className="flex-1 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/70 hover:bg-black/[0.02]"
             onClick={registerPasskey}
           >
-            Register passkey
+            {isPasskeyRegistered ? "Re-register passkey" : "Register passkey"}
           </button>
           {isPasskeyRegistered ? (
             <button
@@ -355,9 +372,15 @@ export default function Settings() {
         isOpen={isPasskeyPromptOpen}
         onCancel={() => {
           passkeyAbortRef.current?.abort();
+          passkeyCancelRef.current = true;
           setIsPasskeyPromptOpen(false);
         }}
-        description="Complete the passkey prompt to continue."
+        title={passkeyPromptMode === "register" ? "Setting up passkey" : "Verifying passkey"}
+        description={
+          passkeyPromptMode === "register"
+            ? "Follow your device prompt to create a passkey."
+            : "Complete the passkey prompt to continue."
+        }
         status={passkeyPromptStatus}
       />
     </section>
