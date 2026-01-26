@@ -94,22 +94,20 @@ export default function Settings() {
   return (
     <section className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-xl font-semibold">Settings</h2>
-        <p className="text-sm text-slate-300">
-          Manage theme and local data.
-        </p>
+        <h2 className="text-xl font-semibold text-black/90">Settings</h2>
+        <p className="text-sm text-black/50">Manage theme, data, and notifications.</p>
       </div>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-        <p className="text-sm font-semibold text-slate-100">Theme</p>
+      <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+        <p className="text-sm font-semibold text-black/80">Theme</p>
         <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
           {(["system", "light", "dark"] as const).map((option) => (
             <button
               key={option}
-              className={`rounded-xl border px-3 py-2 ${
+              className={`rounded-xl border px-3 py-2 font-semibold transition ${
                 theme === option
-                  ? "border-sky-400 bg-sky-400/10 text-sky-200"
-                  : "border-slate-700 text-slate-300"
+                  ? "border-purple-500 bg-purple-50 text-purple-700"
+                  : "border-black/10 text-black/60 hover:border-black/20 hover:bg-black/[0.02]"
               }`}
               onClick={() => setTheme(option)}
             >
@@ -119,11 +117,11 @@ export default function Settings() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
-        <p className="font-semibold text-slate-100">Data</p>
+      <div className="rounded-2xl border border-black/10 bg-white p-4 text-sm text-black/60 shadow-sm">
+        <p className="font-semibold text-black/80">Data</p>
         <div className="mt-3 flex flex-col gap-2">
           <button
-            className="rounded-xl border border-slate-700 px-3 py-2 text-left text-sm text-slate-200"
+            className="rounded-xl border border-black/10 bg-white px-3 py-2 text-left text-sm font-semibold text-black/70 hover:bg-black/[0.02]"
             onClick={handleExport}
           >
             Export as JSON
@@ -138,14 +136,14 @@ export default function Settings() {
               aria-label="Import JSON data"
             />
             <button
-              className="w-full rounded-xl border border-slate-700 px-3 py-2 text-left text-sm text-slate-200"
+              className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-left text-sm font-semibold text-black/70 hover:bg-black/[0.02]"
               onClick={() => fileInputRef.current?.click()}
             >
               Import JSON data
             </button>
           </div>
           <button
-            className="rounded-xl border border-rose-500/50 px-3 py-2 text-left text-sm text-rose-200"
+            className="rounded-xl border border-rose-500/40 bg-rose-50 px-3 py-2 text-left text-sm font-semibold text-rose-700 hover:bg-rose-100"
             onClick={handleReset}
           >
             Reset local data
@@ -153,19 +151,19 @@ export default function Settings() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
-        <p className="font-semibold text-slate-100">Notifications (optional)</p>
-        <p className="mt-1 text-xs text-slate-400">
+      <div className="rounded-2xl border border-black/10 bg-white p-4 text-sm text-black/60 shadow-sm">
+        <p className="font-semibold text-black/80">Notifications (optional)</p>
+        <p className="mt-1 text-xs text-black/40">
           iOS requires the app to be installed before prompts show.
         </p>
         <button
-          className="mt-3 rounded-xl border border-slate-700 px-3 py-2 text-sm text-slate-200"
+          className="mt-3 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/70 hover:bg-black/[0.02]"
           onClick={requestNotifications}
         >
           Request permission
         </button>
         {notifications ? (
-          <p className="mt-2 text-xs text-slate-400">{notifications}</p>
+          <p className="mt-2 text-xs text-black/50">{notifications}</p>
         ) : null}
       </div>
 
@@ -173,8 +171,8 @@ export default function Settings() {
         <div
           className={`rounded-2xl border p-3 text-xs ${
             error
-              ? "border-rose-500/40 bg-rose-500/10 text-rose-100"
-              : "border-emerald-500/40 bg-emerald-500/10 text-emerald-100"
+              ? "border-rose-500/30 bg-rose-50 text-rose-700"
+              : "border-emerald-500/30 bg-emerald-50 text-emerald-700"
           }`}
           role="status"
         >

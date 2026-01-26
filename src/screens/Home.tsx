@@ -27,6 +27,7 @@ import {
   MdQrCode,
   MdQrCodeScanner,
   MdSave,
+  MdSettings,
   MdShare
 } from "react-icons/md";
 import { FaInstagram, FaLinkedinIn, FaSkype, FaWhatsapp } from "react-icons/fa";
@@ -47,6 +48,7 @@ import {
 } from "../utils/storage";
 import { Modal } from "../components/Modal";
 import { QrModal } from "../components/QrModal";
+import Settings from "./Settings";
 
 const iconRegistry = {
   person: MdPerson,
@@ -386,6 +388,7 @@ export default function Home() {
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [exportPassword, setExportPassword] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -828,6 +831,21 @@ export default function Home() {
               <button
                 className="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-white"
                 onClick={() => {
+                  setIsDrawerOpen(false);
+                  setIsSettingsOpen(true);
+                }}
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-100 text-purple-700 shadow-sm">
+                  <MdSettings className="text-lg" />
+                </span>
+                <span className="flex-1">Settings</span>
+              </button>
+            </div>
+
+            <div className="rounded-2xl bg-black/[0.03] p-2 shadow-sm">
+              <button
+                className="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-white"
+                onClick={() => {
                   if (!hasAnyData) {
                     showMessage("Please save your information first", "warn");
                     return;
@@ -1057,6 +1075,11 @@ export default function Home() {
               {isExporting ? "Encrypting..." : "Export"}
             </button>
           </div>
+        </div>
+      </Modal>
+      <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)}>
+        <div className="max-h-[70vh] overflow-y-auto pr-1 text-left">
+          <Settings />
         </div>
       </Modal>
       <Modal isOpen={isClearConfirmOpen} onClose={() => setIsClearConfirmOpen(false)}>
