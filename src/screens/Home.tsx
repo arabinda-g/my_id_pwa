@@ -861,7 +861,9 @@ export default function Home() {
         profileImage: getProfileImage(),
         pinnedFields: pinned,
         upiQrImage: upiImage,
-        categories
+        categories,
+        lockedSections,
+        lockedFields
       }
     };
     try {
@@ -948,6 +950,12 @@ export default function Home() {
         ? profileObject.pinnedFields.filter((item): item is string => typeof item === "string")
         : [];
       const upiImage = typeof profileObject.upiQrImage === "string" ? profileObject.upiQrImage : "";
+      const importedLockedSections = Array.isArray(profileObject.lockedSections)
+        ? profileObject.lockedSections.filter((item): item is string => typeof item === "string")
+        : [];
+      const importedLockedFields = Array.isArray(profileObject.lockedFields)
+        ? profileObject.lockedFields.filter((item): item is string => typeof item === "string")
+        : [];
       const importedCategories = parseStoredCategories(profileObject.categories);
       if (!importedCategories) {
         throw new Error("Invalid profile config");
@@ -960,10 +968,10 @@ export default function Home() {
       await saveUpiQrImageProtected(upiImage);
       setPinnedFields(normalizedPinned);
       setCategories(importedCategories);
-      setLockedSections([]);
-      setLockedFields([]);
-      setSectionLocks([]);
-      setFieldLocks([]);
+      setLockedSections(importedLockedSections);
+      setLockedFields(importedLockedFields);
+      setSectionLocks(importedLockedSections);
+      setFieldLocks(importedLockedFields);
       setIsViewMode(
         passkeyEnabled
           ? hasStoredUserData()
