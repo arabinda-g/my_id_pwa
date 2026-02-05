@@ -4,6 +4,7 @@ import {
   getAllUsers,
   upsertUser,
   clearUsers,
+  clearQueue,
   getUser
 } from "../data/db";
 import { processQueue, queueUpsert, startQueueProcessor } from "../data/sync";
@@ -26,8 +27,7 @@ export function useUserData() {
 
       const saved = await upsertUser({ ...sampleUser, updatedAt: Date.now() });
       setUser(saved);
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError("Unable to load profile data.");
     } finally {
       setLoading(false);
@@ -59,6 +59,7 @@ export function useUserData() {
 
   const reset = useCallback(async () => {
     await clearUsers();
+    await clearQueue();
     setUser(null);
   }, []);
 

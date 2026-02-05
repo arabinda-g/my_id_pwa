@@ -3,13 +3,11 @@ import { registerSW } from "virtual:pwa-register";
 export function registerServiceWorker() {
   registerSW({
     immediate: true,
-    onRegistered(swUrl) {
-      if (import.meta.env.DEV) {
-        console.info("Service worker registered:", swUrl);
-      }
+    onRegistered() {
+      // Service worker registered successfully
     },
-    onRegisterError(error) {
-      console.error("Service worker registration error:", error);
+    onRegisterError() {
+      // Service worker registration failed - user will still have basic functionality
     }
   });
 }

@@ -26,9 +26,13 @@ export default function App() {
     setIsPasskeyPromptOpen(true);
     setPasskeyPromptStatus("verifying");
     const result = await verifyPasskey(controller.signal);
+    // Clear the abort controller reference immediately after use
+    passkeyAbortRef.current = null;
     if (result.ok) {
       setIsPasskeyVerified(true);
       setPasskeyPromptStatus("success");
+      // Clear any previous auth error on success
+      setAuthError(null);
       window.setTimeout(() => setIsPasskeyPromptOpen(false), 450);
     } else {
       setAuthError(result.error ?? "Passkey verification failed.");
@@ -40,6 +44,16 @@ export default function App() {
   useEffect(() => {
     setHasSeenGetStarted(getBoolean(storageKeys.hasSeenGetStarted, false));
     setIsLoading(false);
+
+    // Cleanup sensitive auth state on unmount
+    return () => {
+      setAuthError(null);
+      setIsPasskeyVerified(false);
+      setIsAuthenticating(false);
+      setIsPasskeyPromptOpen(false);
+      passkeyAbortRef.current?.abort();
+      passkeyAbortRef.current = null;
+    };
   }, []);
 
   useEffect(() => {

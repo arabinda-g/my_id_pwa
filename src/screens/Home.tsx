@@ -767,7 +767,8 @@ export default function Home() {
   const hasAnyData = passkeyEnabled
     ? hasStoredUserData()
     : Object.values(userData).some((value) => value.trim().length > 0);
-  const qrData = useMemo(() => buildVCard(userData), [userData]);
+  // Only compute QR data when modal is open to prevent sensitive data persistence in memory
+  const qrData = useMemo(() => (isQrOpen ? buildVCard(userData) : ""), [isQrOpen, userData]);
 
   const toBase64 = (buffer: ArrayBuffer) => {
     let binary = "";

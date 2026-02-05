@@ -14,6 +14,17 @@ export function Modal({ isOpen, onClose, children, chromeless = false }: ModalPr
   const closeTimerRef = useRef<number | null>(null);
   const previousOverflowRef = useRef<string | null>(null);
 
+  // Cleanup refs and state on unmount
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+      previousOverflowRef.current = null;
+    };
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       if (closeTimerRef.current) {

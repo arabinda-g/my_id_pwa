@@ -15,6 +15,14 @@ export default function Card() {
     }
   }, [user]);
 
+  // Cleanup sensitive draft data on unmount
+  useEffect(() => {
+    return () => {
+      setDraft(null);
+      setMessage(null);
+    };
+  }, []);
+
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!draft) return;

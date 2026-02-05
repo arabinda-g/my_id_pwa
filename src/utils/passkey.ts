@@ -257,6 +257,9 @@ export const encryptExistingData = async () => {
 export const decryptExistingData = async () => {
   const key = await getDataKey();
   if (!key) return;
+
+  // Decrypt all data into memory first before any storage operations
+  // to minimize the window where both encrypted and decrypted data exist
   const encryptedUserData = getEncryptedMap(passkeyStorageKeys.encryptedUserData);
   const decryptedUserData: Record<string, string> = {};
   for (const [fieldKey, payload] of Object.entries(encryptedUserData)) {
@@ -266,43 +269,63 @@ export const decryptExistingData = async () => {
       // ignore corrupt field
     }
   }
-  setUserData(decryptedUserData);
 
+  let decryptedPinned: string[] | null = null;
   const pinnedPayload = getEncryptedValue(passkeyStorageKeys.encryptedPinnedFields);
   if (pinnedPayload) {
     try {
       const pinned = JSON.parse(await decryptString(pinnedPayload, key)) as string[];
       if (Array.isArray(pinned)) {
-        setPinnedFields(pinned);
+        decryptedPinned = pinned;
       }
     } catch {
       // ignore
     }
   }
 
+  let decryptedUpi: string | null = null;
   const upiPayload = getEncryptedValue(passkeyStorageKeys.encryptedUpiQrImage);
   if (upiPayload) {
     try {
-      setUpiQrImage(await decryptString(upiPayload, key));
+      decryptedUpi = await decryptString(upiPayload, key);
     } catch {
       // ignore
     }
   }
 
+  let decryptedConfig: unknown = null;
   const configPayload = getEncryptedValue(passkeyStorageKeys.encryptedProfileConfig);
   if (configPayload) {
     try {
-      setProfileConfig(JSON.parse(await decryptString(configPayload, key)));
+      decryptedConfig = JSON.parse(await decryptString(configPayload, key));
     } catch {
       // ignore
     }
   }
 
+  // Remove encrypted data first to prevent both versions existing simultaneously
   localStorage.removeItem(passkeyStorageKeys.encryptedUserData);
   localStorage.removeItem(passkeyStorageKeys.encryptedPinnedFields);
   localStorage.removeItem(passkeyStorageKeys.encryptedUpiQrImage);
   localStorage.removeItem(passkeyStorageKeys.encryptedProfileConfig);
   localStorage.removeItem(passkeyStorageKeys.dataKey);
+
+  // Now write the decrypted data
+  setUserData(decryptedUserData);
+  if (decryptedPinned) {
+    setPinnedFields(decryptedPinned);
+  }
+  if (decryptedUpi) {
+    setUpiQrImage(decryptedUpi);
+  }
+  if (decryptedConfig !== null) {
+    setProfileConfig(decryptedConfig);
+  }
+
+  // Clear memory references to decrypted data
+  Object.keys(decryptedUserData).forEach((key) => {
+    decryptedUserData[key] = "";
+  });
 };
 
 export const saveUserDataProtected = async (data: Record<string, string>) => {
