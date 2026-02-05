@@ -149,8 +149,14 @@ const iconOptions: { key: IconKey; label: string }[] = [
 
 const colorOptions = ["#3b82f6", "#22c55e", "#f97316", "#a855f7", "#4f46e5", "#14b8a6", "#ef4444"];
 
-const createId = () =>
-  `section_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+const createId = () => {
+  const randomBytes = crypto.getRandomValues(new Uint8Array(4));
+  const randomPart = Array.from(randomBytes)
+    .map((b) => b.toString(36))
+    .join("")
+    .slice(0, 7);
+  return `section_${Date.now().toString(36)}_${randomPart}`;
+};
 
 const resolveIcon = (iconKey?: IconKey) => iconRegistry[iconKey ?? "info"] ?? MdInfoOutline;
 
@@ -282,10 +288,23 @@ const stripUrlPrefix = (value: string) => {
 
 const getUrlHref = (value: string) => {
   const trimmed = value.trim();
-  if (!trimmed) return trimmed;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
-  return trimmed;
+  if (!trimmed) return "#";
+
+  try {
+    // Handle www. prefix by adding https://
+    const urlString = /^www\./i.test(trimmed) ? `https://${trimmed}` : trimmed;
+    const url = new URL(urlString);
+
+    // Only allow http and https protocols to prevent XSS via javascript:, data:, etc.
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return "#";
+    }
+
+    return url.toString();
+  } catch {
+    // Invalid URL - return safe fallback
+    return "#";
+  }
 };
 
 const buildVCard = (userData: Record<string, string>) => {
@@ -779,7 +798,18 @@ export default function Home() {
     return btoa(binary);
   };
 
+  const isValidBase64 = (value: string): boolean => {
+    if (!value || typeof value !== "string") return false;
+    // Standard base64 pattern (allows padding)
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    // Length must be divisible by 4 (with padding)
+    return base64Regex.test(value) && value.length % 4 === 0;
+  };
+
   const fromBase64 = (value: string) => {
+    if (!isValidBase64(value)) {
+      throw new Error("Invalid base64 string");
+    }
     const binary = atob(value);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i += 1) {

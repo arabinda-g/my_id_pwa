@@ -40,7 +40,18 @@ const bufferToBase64 = (buffer: ArrayBuffer) => {
   return btoa(binary);
 };
 
+const isValidBase64 = (value: string): boolean => {
+  if (!value || typeof value !== "string") return false;
+  // Standard base64 pattern (allows padding)
+  const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+  // Length must be divisible by 4 (with padding)
+  return base64Regex.test(value) && value.length % 4 === 0;
+};
+
 const base64ToBuffer = (value: string) => {
+  if (!isValidBase64(value)) {
+    throw new Error("Invalid base64 string");
+  }
   const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) {
@@ -169,8 +180,8 @@ export const verifyPasskey = async (signal?: AbortSignal) => {
     if (err instanceof DOMException && err.name === "AbortError") {
       return { ok: false, error: "Passkey verification was cancelled." };
     }
-    const message = err instanceof Error && err.message ? err.message : "Passkey verification failed.";
-    return { ok: false, error: message };
+    // Return generic error message to avoid exposing implementation details
+    return { ok: false, error: "Passkey verification failed. Please try again." };
   }
 };
 

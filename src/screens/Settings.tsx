@@ -195,10 +195,9 @@ export default function Settings() {
       setPasskeyPromptStatus("success");
       window.setTimeout(() => setIsPasskeyPromptOpen(false), 450);
       window.dispatchEvent(new Event("passkey-change"));
-    } catch (err) {
-      const messageText =
-        err instanceof Error && err.message ? err.message : "Passkey registration failed.";
-      setPasskeyStatus(messageText);
+    } catch {
+      // Return generic error message to avoid exposing implementation details
+      setPasskeyStatus("Passkey registration failed. Please try again.");
       setIsPasskeyPromptOpen(false);
     }
   };
