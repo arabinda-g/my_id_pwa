@@ -1112,7 +1112,7 @@ export default function Home() {
             </label>
             <div className="text-center">
               <p className="text-lg font-semibold">{userName}</p>
-              {userEmail ? <p className="text-sm text-black/50">{userEmail}</p> : null}
+              {userEmail ? <p className="text-sm text-black/50 dark:text-white/50">{userEmail}</p> : null}
             </div>
           </div>
         </div>
@@ -1229,12 +1229,12 @@ export default function Home() {
         <button
           type="button"
           aria-label="Open menu"
-          className={`fixed left-4 top-4 rounded-xl bg-white/90 p-3 shadow-md ${
+          className={`fixed left-4 top-4 rounded-xl bg-white/90 p-3 shadow-md dark:bg-[#1a1a1a]/90 ${
             isDrawerOpen ? "hidden" : "z-30"
           }`}
           onClick={() => setIsDrawerOpen(true)}
         >
-          <MdMenu className="text-2xl text-black/70" />
+          <MdMenu className="text-2xl text-black/70 dark:text-white/70" />
         </button>
         <UserInfoForm
           isViewMode={isViewMode}
@@ -1885,7 +1885,7 @@ function UserInfoForm({
               )}
               <div className="flex-1">
                 <p className="text-sm font-semibold text-black/80 dark:text-white/80">Profile photo (optional)</p>
-                <p className="text-xs text-black/50">Upload a square image for best results</p>
+                <p className="text-xs text-black/50 dark:text-white/50">Upload a square image for best results</p>
               </div>
               <input
                 ref={profileInputRef}
@@ -1919,15 +1919,15 @@ function UserInfoForm({
                   style={{ width: `${Math.round(completionPercentage * 100)}%` }}
                 />
               </div>
-              <p className="mt-2 text-xs font-medium text-black/50">
+              <p className="mt-2 text-xs font-medium text-black/50 dark:text-white/50">
                 {Math.round(completionPercentage * 100)}% Complete
               </p>
             </div>
             <div className="mt-4 rounded-2xl border border-black/5 bg-white p-4">
-              <div className="flex items-center gap-2 text-black/60">
+              <div className="flex items-center gap-2 text-black/60 dark:text-white/60">
                 <MdInfoOutline />
                 <p className="text-base font-semibold">Quick Info</p>
-                <span className="text-xs text-black/40">Drag to reorder pinned items</span>
+                <span className="text-xs text-black/40 dark:text-white/40">Drag to reorder pinned items</span>
               </div>
               {pinnedQuickInfoEditable.length ? (
                 <div className="mt-3 flex flex-wrap gap-3">
@@ -1954,17 +1954,17 @@ function UserInfoForm({
                         setDraggingKey(null);
                       }}
                       onDragEnd={() => setDraggingKey(null)}
-                      className="flex items-center gap-2 rounded-2xl border border-black/5 bg-gradient-to-br from-white to-gray-50 px-3 py-2 text-sm font-semibold text-purple-700 shadow-sm"
+                      className="flex items-center gap-2 rounded-2xl border border-black/5 bg-gradient-to-br from-white to-gray-50 px-3 py-2 text-sm font-semibold text-purple-700 shadow-sm dark:border-white/10 dark:from-[#252525] dark:to-[#1a1a1a] dark:text-purple-400"
                       aria-label={`Reorder ${item.label}`}
                     >
-                      <MdMenu className="text-base text-black/40" />
+                      <MdMenu className="text-base text-black/40 dark:text-white/40" />
                       <item.Icon className="text-base" />
                       <span>{item.label}</span>
                     </button>
                   ))}
                 </div>
               ) : (
-                <p className="mt-3 text-sm text-black/40">
+                <p className="mt-3 text-sm text-black/40 dark:text-white/40">
                   Pin fields to add Quick Info items.
                 </p>
               )}
@@ -2443,7 +2443,7 @@ function CategorySection({
               <button
                 type="button"
                 className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
-                  isSectionLocked ? "bg-black/10 text-black/60" : "bg-green-100 text-green-700"
+                  isSectionLocked ? "bg-black/10 text-black/60 dark:bg-white/10 dark:text-white/60" : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
                 }`}
                 onClick={() => onToggleSectionLock(category.id)}
               >
@@ -2465,7 +2465,7 @@ function CategorySection({
       </div>
       <div className="space-y-3 px-5 py-5">
         {isViewMode && isSectionLocked ? (
-          <div className="rounded-2xl border border-dashed border-black/10 bg-black/[0.02] px-4 py-3 text-sm text-black/60">
+          <div className="rounded-2xl border border-dashed border-black/10 bg-black/[0.02] px-4 py-3 text-sm text-black/60 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/60">
             Unlock this section to view details.
           </div>
         ) : null}
@@ -2645,7 +2645,7 @@ function FieldRow({
       ? "QR image added"
       : displayValue;
   const displayNode = isUrlValue(displayText)
-    ? renderUrlValue(displayText, "text-black/40", "text-black/80")
+    ? renderUrlValue(displayText, "text-black/40 dark:text-white/40", "text-black/80 dark:text-white/80")
     : displayText;
   const modalLabel = isLocked && isName ? "Name" : isName ? "Name" : field.label;
   const modalValueToShow = isLocked ? revealedValue : modalValue;
@@ -2813,7 +2813,7 @@ function FieldRow({
         ) : null}
         {isUpi && upiQrImage ? (
           <button
-            className="rounded-md p-1 text-black/40"
+            className="rounded-md p-1 text-black/40 dark:text-white/40"
             onClick={onClearUpiImage}
             aria-label="Remove UPI QR image"
             type="button"
@@ -2836,7 +2836,7 @@ function FieldRow({
         ) : null}
         {value ? (
           <button
-            className="rounded-md p-1 text-black/40"
+            className="rounded-md p-1 text-black/40 dark:text-white/40"
             onClick={() => onChange("")}
             aria-label={`Clear ${field.label}`}
             type="button"
