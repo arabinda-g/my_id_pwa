@@ -923,6 +923,7 @@ export default function Home() {
       URL.revokeObjectURL(url);
       setIsExportOpen(false);
       setExportPassword("");
+      showMessage("Profile exported successfully", "ok");
     } catch {
       showMessage("Export failed", "error");
     } finally {
@@ -1401,7 +1402,20 @@ export default function Home() {
       </Modal>
       <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)}>
         <div className="max-h-[70vh] overflow-y-auto pr-1 text-left">
-          <Settings />
+          <Settings
+            onExportProfile={() => {
+              setIsSettingsOpen(false);
+              if (!hasAnyData) {
+                showMessage("Please save your information first", "warn");
+                return;
+              }
+              setIsExportOpen(true);
+            }}
+            onImportProfile={() => {
+              setIsSettingsOpen(false);
+              fileInputRef.current?.click();
+            }}
+          />
         </div>
       </Modal>
       <Modal isOpen={isClearConfirmOpen} onClose={() => setIsClearConfirmOpen(false)}>

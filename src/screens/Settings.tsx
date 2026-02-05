@@ -25,7 +25,12 @@ function isValidUser(user: User) {
   );
 }
 
-export default function Settings() {
+type SettingsProps = {
+  onExportProfile?: () => void;
+  onImportProfile?: () => void;
+};
+
+export default function Settings({ onExportProfile, onImportProfile }: SettingsProps) {
   const { theme, setTheme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -280,24 +285,26 @@ export default function Settings() {
         <div className="mt-3 flex flex-col gap-2">
           <button
             className="rounded-xl border border-black/10 bg-white px-3 py-2 text-left text-sm font-semibold text-black/70 hover:bg-black/[0.02]"
-            onClick={handleExport}
+            onClick={onExportProfile ?? handleExport}
           >
-            Export as JSON
+            Export Profile
           </button>
           <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/json"
-              onChange={handleImport}
-              className="hidden"
-              aria-label="Import JSON data"
-            />
+            {!onImportProfile && (
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/json"
+                onChange={handleImport}
+                className="hidden"
+                aria-label="Import JSON data"
+              />
+            )}
             <button
               className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-left text-sm font-semibold text-black/70 hover:bg-black/[0.02]"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={onImportProfile ?? (() => fileInputRef.current?.click())}
             >
-              Import JSON data
+              Import Profile
             </button>
           </div>
           <button
