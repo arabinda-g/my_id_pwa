@@ -1,6 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+// Global counter to track open modals and manage body overflow
+let openModalCount = 0;
+let originalOverflow = "";
+
+function lockScroll() {
+  if (openModalCount === 0) {
+    originalOverflow = document.body.style.overflow;
+  }
+  openModalCount++;
+  document.body.style.overflow = "hidden";
+}
+
+function unlockScroll() {
+  openModalCount = Math.max(0, openModalCount - 1);
+  if (openModalCount === 0) {
+    document.body.style.overflow = originalOverflow;
+  }
+}
+
 type ModalProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -12,7 +31,7 @@ export function Modal({ isOpen, onClose, children, chromeless = false }: ModalPr
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isVisible, setIsVisible] = useState(isOpen);
   const closeTimerRef = useRef<number | null>(null);
-  const previousOverflowRef = useRef<string | null>(null);
+  const hasLockedScrollRef = useRef(false);
 
   // Cleanup refs and state on unmount
   useEffect(() => {
@@ -21,7 +40,11 @@ export function Modal({ isOpen, onClose, children, chromeless = false }: ModalPr
         window.clearTimeout(closeTimerRef.current);
         closeTimerRef.current = null;
       }
-      previousOverflowRef.current = null;
+      // Ensure scroll is unlocked if component unmounts while open
+      if (hasLockedScrollRef.current) {
+        unlockScroll();
+        hasLockedScrollRef.current = false;
+      }
     };
   }, []);
 
@@ -59,15 +82,18 @@ export function Modal({ isOpen, onClose, children, chromeless = false }: ModalPr
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") stableOnClose();
     };
-    // Only capture overflow when modal first opens
-    if (previousOverflowRef.current === null) {
-      previousOverflowRef.current = document.body.style.overflow;
+    // Lock scroll when modal opens
+    if (!hasLockedScrollRef.current) {
+      lockScroll();
+      hasLockedScrollRef.current = true;
     }
-    document.body.style.overflow = "hidden";
     document.addEventListener("keydown", handleKey);
     return () => {
-      document.body.style.overflow = previousOverflowRef.current ?? "";
-      previousOverflowRef.current = null;
+      // Unlock scroll when modal closes
+      if (hasLockedScrollRef.current) {
+        unlockScroll();
+        hasLockedScrollRef.current = false;
+      }
       document.removeEventListener("keydown", handleKey);
     };
   }, [shouldRender, stableOnClose]);
