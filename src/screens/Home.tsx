@@ -1024,8 +1024,32 @@ export default function Home() {
       );
       await refreshViewData();
       showMessage("Profile imported", "ok");
-    } catch {
-      showMessage("Import failed", "error");
+    } catch (error) {
+      let errorMessage = "Import failed";
+      if (error instanceof DOMException) {
+        // Web Crypto API throws DOMException for decryption failures
+        if (error.name === "OperationError") {
+          errorMessage = "Wrong password or corrupted file";
+        } else {
+          errorMessage = error.name || "Decryption error";
+        }
+      } else if (error instanceof SyntaxError) {
+        // JSON.parse throws SyntaxError
+        errorMessage = "Invalid file format (not valid JSON)";
+      } else if (error instanceof Error) {
+        if (error.message === "Invalid profile data") {
+          errorMessage = "Invalid profile data format";
+        } else if (error.message === "Invalid profile config") {
+          errorMessage = "Invalid profile configuration";
+        } else if (error.message.includes("decrypt") || error.message.includes("Decrypt")) {
+          errorMessage = "Wrong password or corrupted file";
+        } else if (error.message.includes("JSON")) {
+          errorMessage = "Invalid file format (not valid JSON)";
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+      }
+      showMessage(errorMessage, "error");
     } finally {
       setIsImporting(false);
       setIsImportOpen(false);
