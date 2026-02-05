@@ -524,6 +524,11 @@ export default function Home() {
   const enterEditMode = async () => {
     const verified = await requirePasskey();
     if (!verified) return;
+    // Reload lock state from localStorage to reset any temporary unlocks from view mode
+    const persistedSectionLocks = getSectionLocks();
+    const persistedFieldLocks = getFieldLocks();
+    setLockedSections(persistedSectionLocks);
+    setLockedFields(persistedFieldLocks);
     const data = await loadUserDataProtected(categories, new Set(), new Set(), true);
     setLocalUserData(data);
     setLocalUpiQrImage(await loadUpiQrImageProtected());
