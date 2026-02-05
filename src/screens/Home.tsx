@@ -149,6 +149,14 @@ const iconOptions: { key: IconKey; label: string }[] = [
 
 const colorOptions = ["#3b82f6", "#22c55e", "#f97316", "#a855f7", "#4f46e5", "#14b8a6", "#ef4444"];
 
+// Sensitive fields that should show a clipboard warning
+const SENSITIVE_FIELD_KEYS = new Set([
+  "passportNumber",
+  "aadhaar",
+  "dlNumber",
+  "panCardNumber"
+]);
+
 const createId = () => {
   const randomBytes = crypto.getRandomValues(new Uint8Array(4));
   const randomPart = Array.from(randomBytes)
@@ -1267,6 +1275,13 @@ export default function Home() {
             void saveUpiQrImageProtected("");
             setLocalUpiQrImage("");
           }}
+          onCopyField={(fieldKey, fieldLabel) => {
+            if (SENSITIVE_FIELD_KEYS.has(fieldKey)) {
+              showMessage(`Copied ${fieldLabel} - Handle with care!`, "warn");
+            } else {
+              showMessage(`Copied ${fieldLabel}`, "ok");
+            }
+          }}
         />
 
       </div>
@@ -1466,6 +1481,7 @@ type UserInfoFormProps = {
   onToggleFieldLock: (fieldKey: string) => void;
   onRevealPinnedValue: (fieldKey: string) => Promise<string>;
   onRevealLockedValue: (fieldKey: string) => Promise<string>;
+  onCopyField: (fieldKey: string, fieldLabel: string) => void;
 };
 
 function UserInfoForm({
@@ -1493,7 +1509,8 @@ function UserInfoForm({
   onToggleSectionLock,
   onToggleFieldLock,
   onRevealPinnedValue,
-  onRevealLockedValue
+  onRevealLockedValue,
+  onCopyField
 }: UserInfoFormProps) {
   const profileInputRef = useRef<HTMLInputElement | null>(null);
   const [isProfileImageOpen, setIsProfileImageOpen] = useState(false);
@@ -1979,6 +1996,7 @@ function UserInfoForm({
                 setActiveFieldCategoryId(categoryId);
                 setIsAddFieldOpen(true);
               }}
+              onCopyField={onCopyField}
             />
           ) : null
         )}
@@ -2258,6 +2276,7 @@ type CategorySectionProps = {
   onFieldDropOnCategory: (categoryId: string) => void;
   onFieldDragEnd: () => void;
   onAddField: (categoryId: string) => void;
+  onCopyField: (fieldKey: string, fieldLabel: string) => void;
 };
 
 function CategorySection({
@@ -2288,7 +2307,8 @@ function CategorySection({
   onFieldDropOnField,
   onFieldDropOnCategory,
   onFieldDragEnd,
-  onAddField
+  onAddField,
+  onCopyField
 }: CategorySectionProps) {
   const Icon = resolveIcon(category.iconKey);
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
@@ -2462,6 +2482,7 @@ function CategorySection({
                   upiQrImage={upiQrImage}
                   onPasteUpiImage={onPasteUpiImage}
                   onClearUpiImage={onClearUpiImage}
+                  onCopy={onCopyField}
                 />
               </div>
             </div>
@@ -2541,6 +2562,7 @@ type FieldRowProps = {
   upiQrImage: string;
   onPasteUpiImage: () => void;
   onClearUpiImage: () => void;
+  onCopy: (fieldKey: string, fieldLabel: string) => void;
 };
 
 function FieldRow({
@@ -2557,7 +2579,8 @@ function FieldRow({
   fullNameValue,
   upiQrImage,
   onPasteUpiImage,
-  onClearUpiImage
+  onClearUpiImage,
+  onCopy
 }: FieldRowProps) {
   const Icon = resolveIcon(field.iconKey);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
@@ -2642,6 +2665,7 @@ function FieldRow({
               event.stopPropagation();
               if (!value || isLocked) return;
               navigator.clipboard.writeText(value);
+              onCopy(field.key, field.label);
             }}
             aria-label={`Copy ${field.label}`}
             disabled={!value || isLocked}
@@ -2762,7 +2786,10 @@ function FieldRow({
         {value ? (
           <button
             className="rounded-md p-1 text-purple-700"
-            onClick={() => navigator.clipboard.writeText(value)}
+            onClick={() => {
+              navigator.clipboard.writeText(value);
+              onCopy(field.key, field.label);
+            }}
             aria-label={`Copy ${field.label}`}
             type="button"
           >
