@@ -1082,12 +1082,12 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F3EFEF] text-black">
+    <div className="min-h-screen bg-[#F3EFEF] text-black dark:bg-[#0f0f0f] dark:text-white">
       {isDrawerOpen ? (
         <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setIsDrawerOpen(false)} />
       ) : null}
       <div
-        className={`fixed left-0 top-0 z-50 h-full w-72 bg-white shadow-2xl transition-transform duration-300 ${
+        className={`fixed left-0 top-0 z-50 h-full w-72 bg-white shadow-2xl transition-transform duration-300 dark:bg-[#1a1a1a] ${
           isDrawerOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -1116,8 +1116,8 @@ export default function Home() {
             </div>
           </div>
         </div>
-        <div className="border-t border-black/10 px-6 py-4">
-          <div className="text-xs font-semibold uppercase tracking-widest text-black/50">
+        <div className="border-t border-black/10 px-6 py-4 dark:border-white/10">
+          <div className="text-xs font-semibold uppercase tracking-widest text-black/50 dark:text-white/50">
             Quick actions
           </div>
           {isViewMode ? (
@@ -1138,9 +1138,9 @@ export default function Home() {
             </div>
           ) : null}
           <div className="mt-3 space-y-4">
-            <div className="rounded-2xl bg-black/[0.03] p-2 shadow-sm">
+            <div className="rounded-2xl bg-black/[0.03] p-2 shadow-sm dark:bg-white/[0.05]">
               <button
-                className="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-white"
+                className="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-white dark:hover:bg-white/10"
                 onClick={() => {
                   setIsDrawerOpen(false);
                   if (!hasAnyData) {
@@ -1150,16 +1150,16 @@ export default function Home() {
                   setIsQrOpen(true);
                 }}
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-100 text-green-700 shadow-sm">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-100 text-green-700 shadow-sm dark:bg-green-900/40 dark:text-green-400">
                   <MdQrCode className="text-lg" />
                 </span>
                 <span className="flex-1">QR Code</span>
               </button>
             </div>
 
-            <div className="rounded-2xl bg-black/[0.03] p-2 shadow-sm">
+            <div className="rounded-2xl bg-black/[0.03] p-2 shadow-sm dark:bg-white/[0.05]">
               <button
-                className="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-white"
+                className="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-white dark:hover:bg-white/10"
                 onClick={() => {
                   setIsDrawerOpen(false);
                   void (async () => {
@@ -1169,16 +1169,16 @@ export default function Home() {
                   })();
                 }}
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-100 text-purple-700 shadow-sm">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-100 text-purple-700 shadow-sm dark:bg-purple-900/40 dark:text-purple-400">
                   <MdSettings className="text-lg" />
                 </span>
                 <span className="flex-1">Settings</span>
               </button>
             </div>
 
-            <div className="rounded-2xl bg-black/[0.03] p-2 shadow-sm">
+            <div className="rounded-2xl bg-black/[0.03] p-2 shadow-sm dark:bg-white/[0.05]">
               <button
-                className="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-white"
+                className="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-white dark:hover:bg-white/10"
                 onClick={() => {
                   if (!hasAnyData) {
                     showMessage("Please save your information first", "warn");
@@ -1187,7 +1187,7 @@ export default function Home() {
                   setIsExportOpen(true);
                 }}
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-700 shadow-sm">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-700 shadow-sm dark:bg-blue-900/40 dark:text-blue-400">
                   <MdFileUpload className="text-lg" />
                 </span>
                 <span className="flex-1">Export Profile</span>
@@ -1202,20 +1202,20 @@ export default function Home() {
                   aria-label="Import profile"
                 />
                 <button
-                  className="group mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-white"
+                  className="group mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-white dark:hover:bg-white/10"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 shadow-sm">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 shadow-sm dark:bg-indigo-900/40 dark:text-indigo-400">
                     <MdFileDownload className="text-lg" />
                   </span>
                   <span className="flex-1">Import Profile</span>
                 </button>
               </div>
               <button
-                className="group mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-white"
+                className="group mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-white dark:text-red-400 dark:hover:bg-white/10"
                 onClick={() => setIsClearConfirmOpen(true)}
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100 text-red-700 shadow-sm">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100 text-red-700 shadow-sm dark:bg-red-900/40 dark:text-red-400">
                   <MdDeleteForever className="text-lg" />
                 </span>
                 <span className="flex-1">Clear All Data</span>
@@ -1792,7 +1792,7 @@ function UserInfoForm({
 
   return (
     <div className="px-4 pb-16 pt-20">
-      <div className="relative rounded-3xl border border-purple-200/70 bg-white p-6 shadow-lg shadow-black/10">
+      <div className="relative rounded-3xl border border-purple-200/70 bg-white p-6 shadow-lg shadow-black/10 dark:border-purple-500/30 dark:bg-[#1a1a1a]">
         <button
           type="button"
           aria-label="Share QR code"
@@ -1825,17 +1825,17 @@ function UserInfoForm({
                 </div>
               )}
               <div className="flex-1">
-                <p className="text-2xl font-bold text-black/90">
+                <p className="text-2xl font-bold text-black/90 dark:text-white/90">
                   {userData["firstName"] || "User"}
                 </p>
-                <p className="text-sm font-medium text-black/50">
+                <p className="text-sm font-medium text-black/50 dark:text-white/50">
                   {userData["email"] || "Digital Identity Profile"}
                 </p>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-black/5 bg-white p-4">
-              <div className="flex items-center gap-2 text-black/60">
+            <div className="rounded-2xl border border-black/5 bg-white p-4 dark:border-white/10 dark:bg-white/5">
+              <div className="flex items-center gap-2 text-black/60 dark:text-white/60">
                 <MdInfoOutline />
                 <p className="text-base font-semibold">Quick Info</p>
               </div>
@@ -1843,7 +1843,7 @@ function UserInfoForm({
                 {pinnedQuickInfo.map((item) => (
                   <button
                     key={item.key}
-                    className="relative flex h-12 w-12 items-center justify-center rounded-2xl border-2 border-purple-200/80 bg-gradient-to-br from-white to-gray-50 text-purple-700 shadow-sm"
+                    className="relative flex h-12 w-12 items-center justify-center rounded-2xl border-2 border-purple-200/80 bg-gradient-to-br from-white to-gray-50 text-purple-700 shadow-sm dark:border-purple-500/40 dark:from-[#252525] dark:to-[#1a1a1a] dark:text-purple-400"
                     onClick={async () => {
                       if (item.isLocked) {
                         const revealed = await onRevealPinnedValue(item.key);
@@ -1871,20 +1871,20 @@ function UserInfoForm({
           <div>
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-black/90">Edit Profile</h2>
-                <p className="text-sm text-black/50">Update your details</p>
+                <h2 className="text-2xl font-bold text-black/90 dark:text-white/90">Edit Profile</h2>
+                <p className="text-sm text-black/50 dark:text-white/50">Update your details</p>
               </div>
             </div>
-            <div className="mt-4 flex items-center gap-4 rounded-2xl border border-black/10 bg-white p-4">
+            <div className="mt-4 flex items-center gap-4 rounded-2xl border border-black/10 bg-white p-4 dark:border-white/10 dark:bg-white/5">
               {profileImage ? (
                 <img src={profileImage} alt="Profile" className="h-16 w-16 rounded-full object-cover" />
               ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-purple-700/10">
-                  <MdPerson className="text-2xl text-purple-700" />
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-purple-700/10 dark:bg-purple-500/20">
+                  <MdPerson className="text-2xl text-purple-700 dark:text-purple-400" />
                 </div>
               )}
               <div className="flex-1">
-                <p className="text-sm font-semibold text-black/80">Profile photo (optional)</p>
+                <p className="text-sm font-semibold text-black/80 dark:text-white/80">Profile photo (optional)</p>
                 <p className="text-xs text-black/50">Upload a square image for best results</p>
               </div>
               <input
@@ -2357,7 +2357,7 @@ function CategorySection({
     passkeyEnabled && (lockedFields.includes(fieldKey) || (isViewMode && isSectionLocked));
   return (
     <div
-      className="overflow-hidden rounded-3xl border bg-white shadow-lg"
+      className="overflow-hidden rounded-3xl border bg-white shadow-lg dark:bg-[#1a1a1a]"
       style={{ borderColor: `${category.color}33` }}
       onDragOver={(event) => {
         if (isViewMode) return;
@@ -2388,7 +2388,7 @@ function CategorySection({
             <button
               type="button"
               draggable
-              className="rounded-lg bg-black/10 p-2 text-black/50"
+              className="rounded-lg bg-black/10 p-2 text-black/50 dark:bg-white/10 dark:text-white/50"
               onDragStart={(event) => {
                 onDragSectionStart(category.id);
                 event.dataTransfer.effectAllowed = "move";
@@ -2417,14 +2417,14 @@ function CategorySection({
           </button>
           {isViewMode ? (
             <p
-              className={`font-bold ${isViewMode ? "text-lg" : "text-base"}`}
-              style={{ color: isViewMode ? "rgba(0,0,0,0.85)" : category.color }}
+              className={`font-bold dark:text-white/85 ${isViewMode ? "text-lg" : "text-base"}`}
+              style={{ color: isViewMode ? undefined : category.color }}
             >
               {category.title}
             </p>
           ) : (
             <input
-              className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/80 outline-none focus:ring-2 focus:ring-purple-600"
+              className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/80 outline-none focus:ring-2 focus:ring-purple-600 dark:border-white/10 dark:bg-[#252525] dark:text-white/80"
               value={category.title}
               onChange={(event) => onUpdateCategoryTitle(category.id, event.target.value)}
               aria-label="Section title"
@@ -2655,7 +2655,7 @@ function FieldRow({
     return (
       <>
         <div
-          className="flex items-center gap-4 rounded-2xl border border-black/5 bg-gradient-to-br from-white to-gray-50 p-4 shadow-md shadow-black/10"
+          className="flex items-center gap-4 rounded-2xl border border-black/5 bg-gradient-to-br from-white to-gray-50 p-4 shadow-md shadow-black/10 dark:border-white/10 dark:from-[#252525] dark:to-[#1a1a1a]"
           role={canOpenModal ? "button" : undefined}
           tabIndex={canOpenModal ? 0 : -1}
           onClick={() => {
@@ -2692,13 +2692,13 @@ function FieldRow({
             <Icon className="text-lg" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-black/40">
+            <p className="text-xs font-semibold uppercase tracking-wide text-black/40 dark:text-white/40">
               {field.label}
             </p>
-            <p className="break-words text-base font-semibold text-black/80">{displayNode}</p>
+            <p className="break-words text-base font-semibold text-black/80 dark:text-white/80">{displayNode}</p>
           </div>
           <button
-            className="rounded-lg bg-black/5 p-2 text-black/50 disabled:opacity-40"
+            className="rounded-lg bg-black/5 p-2 text-black/50 disabled:opacity-40 dark:bg-white/10 dark:text-white/50"
             onClick={(event) => {
               event.stopPropagation();
               if (!value || isLocked) return;
@@ -2713,7 +2713,7 @@ function FieldRow({
           {showLockToggle ? (
             <button
               className={`ml-2 rounded-lg p-2 ${
-                isLocked ? "bg-black/10 text-black/60" : "bg-green-100 text-green-700"
+                isLocked ? "bg-black/10 text-black/60 dark:bg-white/10 dark:text-white/60" : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
               }`}
               onClick={(event) => {
                 event.stopPropagation();
@@ -2772,16 +2772,16 @@ function FieldRow({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={`${field.label}${field.required ? " *" : ""}`}
-        className="w-full rounded-xl bg-[#F3EFEF] pl-12 pr-32 py-3 text-sm text-black placeholder-black/40 truncate outline-none focus:ring-2 focus:ring-purple-700"
+        className="w-full rounded-xl bg-[#F3EFEF] pl-12 pr-32 py-3 text-sm text-black placeholder-black/40 truncate outline-none focus:ring-2 focus:ring-purple-700 dark:bg-[#252525] dark:text-white dark:placeholder-white/40"
       />
-      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-700">
+      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-700 dark:text-purple-400">
         <Icon />
       </span>
       <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1">
         {showLockToggle ? (
           <button
             className={`rounded-md p-1 ${
-              isLocked ? "bg-black/10 text-black/60" : "bg-green-100 text-green-700"
+              isLocked ? "bg-black/10 text-black/60 dark:bg-white/10 dark:text-white/60" : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
             }`}
             onClick={onToggleLock}
             aria-label={isLocked ? `Unlock ${field.label}` : `Lock ${field.label}`}
@@ -2792,7 +2792,7 @@ function FieldRow({
         ) : null}
         <button
           className={`rounded-md p-1 ${
-            isPinned ? "bg-purple-100 text-purple-700" : "bg-black/5 text-black/50"
+            isPinned ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400" : "bg-black/5 text-black/50 dark:bg-white/10 dark:text-white/50"
           }`}
           onClick={() => onTogglePin()}
           aria-label={`${isPinned ? "Unpin" : "Pin"} ${field.label}`}

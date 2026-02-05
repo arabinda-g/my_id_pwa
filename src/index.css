@@ -9,6 +9,12 @@ body {
   color: #111111;
 }
 
+html.dark,
+html.dark body {
+  background: #0f0f0f;
+  color: #f3f3f3;
+}
+
 @layer base {
   * {
     transition-property: color, background-color, border-color,
