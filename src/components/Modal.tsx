@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type ModalProps = {
@@ -12,6 +12,7 @@ export function Modal({ isOpen, onClose, children, chromeless = false }: ModalPr
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isVisible, setIsVisible] = useState(isOpen);
   const closeTimerRef = useRef<number | null>(null);
+  const previousOverflowRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -37,19 +38,28 @@ export function Modal({ isOpen, onClose, children, chromeless = false }: ModalPr
     };
   }, [isOpen, shouldRender]);
 
+  // Memoize onClose reference to prevent effect re-runs
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const stableOnClose = useCallback(() => onCloseRef.current(), []);
+
   useEffect(() => {
     if (!shouldRender) return;
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") stableOnClose();
     };
-    const previousOverflow = document.body.style.overflow;
+    // Only capture overflow when modal first opens
+    if (previousOverflowRef.current === null) {
+      previousOverflowRef.current = document.body.style.overflow;
+    }
     document.body.style.overflow = "hidden";
     document.addEventListener("keydown", handleKey);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      document.body.style.overflow = previousOverflowRef.current ?? "";
+      previousOverflowRef.current = null;
       document.removeEventListener("keydown", handleKey);
     };
-  }, [onClose, shouldRender]);
+  }, [shouldRender, stableOnClose]);
 
   if (!shouldRender) return null;
 
